@@ -1,0 +1,16 @@
+{
+  "name": "@me/adapters",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Adapter contracts for the Faclon platform (I/O Connect, UNS, I/O Sense, Insights, DeepSense, Bruce) and Shield links, with bundle-backed stubs.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@me/schema": "workspace:*"
+  }
+}

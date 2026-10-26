@@ -1,0 +1,11 @@
+import { generateJamnagar } from '../src/index.ts';
+import { Engine, MemoryJournal } from '@me/engine-core';
+const g = generateJamnagar({ seed: 7 });
+const e = new Engine(new MemoryJournal());
+e.append(g.drafts);
+const kill = e.eventsBetween(g.manifest.t0, g.manifest.t1).find((r) => r.kind === 'engagement' && (r.payload as any).result === 'kill')!;
+console.log('kill', kill.record_id, kill.derived_from, (kill.payload as any).target_id, (kill.payload as any).authority_record);
+const auth = e.journal.findById(kill.derived_from![0]!);
+console.log('auth', auth?.kind, auth?.record_id, auth?.derived_from, (auth?.payload as any)?.dp);
+const tr = e.lineage.trace(e.journal, (kill.payload as any).target_id);
+console.log(tr.map((r) => `${r.kind}:${r.record_id}:${(r.payload as any)?.dp ?? ''}`).join('\n'));

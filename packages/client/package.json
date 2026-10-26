@@ -1,0 +1,17 @@
+{
+  "name": "@me/client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless client: transport, entity store with positions, clock, selection, layer state.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@me/geo": "workspace:*",
+    "@me/schema": "workspace:*"
+  }
+}

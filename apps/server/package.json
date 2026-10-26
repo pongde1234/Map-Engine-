@@ -1,0 +1,26 @@
+{
+  "name": "@me/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Map Engine server: journal, REST, WebSocket stream, static app and offline tiles.",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fastify/static": "^10.1.7",
+    "@fastify/websocket": "^11.3.4",
+    "@me/engine-core": "workspace:*",
+    "@me/journal-sqlite": "workspace:*",
+    "@me/scenario": "workspace:*",
+    "@me/schema": "workspace:*",
+    "fastify": "^5.12.7",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "ws": "^8.22.0"
+  }
+}

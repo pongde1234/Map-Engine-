@@ -1,0 +1,17 @@
+{
+  "name": "@me/schema",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Map Engine data contract: record envelope, entity components, wire protocol, codec.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "msgpackr": "^2.1.2",
+    "zod": "^4.6.7"
+  }
+}

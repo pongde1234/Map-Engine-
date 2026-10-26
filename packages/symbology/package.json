@@ -1,0 +1,17 @@
+{
+  "name": "@me/symbology",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MIL-STD-2525 symbology: milsymbol atlas for deck.gl, SIDC validation, profiles.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@me/schema": "workspace:*",
+    "milsymbol": "3.0.4"
+  }
+}

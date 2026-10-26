@@ -1,0 +1,387 @@
+/*
+ * Layout only. Every control, surface and status mark on screen is an FDS component; this
+ * file positions them (the AppShell guard: a split layout inside the shell is plain grid/flex in
+ * the page). Tier-2 tokens only, spacing from the scale, type via Tier-3 classes in markup.
+ */
+
+/* ---------- console grid: left · centre (map + timeline) · right ---------- */
+.bs-console {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+.bs-left,
+.bs-right {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  border-color: var(--border-neutral-default);
+  border-style: solid;
+  border-width: 0;
+}
+/* Each region keeps its own track, so closing a side panel leaves the map in the 1fr column
+   instead of shifting the inspector into it. */
+.bs-left {
+  grid-column: 1;
+  grid-row: 1;
+  /* 256px from the spacing scale */
+  width: calc(var(--spacing-64) * 4);
+  border-right-width: var(--border-width-thin);
+}
+.bs-right {
+  grid-column: 3;
+  grid-row: 1;
+  /* 360px from the spacing scale: the five inspector tabs fit on one line with room to spare. */
+  width: calc(var(--spacing-64) * 5.5 + var(--spacing-8));
+  border-left-width: var(--border-width-thin);
+}
+.bs-center {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.bs-map {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.bs-time {
+  flex: none;
+  border-top: var(--border-width-thin) solid var(--border-neutral-default);
+}
+
+/* ---------- tabs that fill their column (left panel, inspector) ---------- */
+.bs-left__tabs,
+.bs-tabs-fill {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* The strip's inset comes from a wrapper, never from the Tabs' own parts. */
+.bs-tabbar {
+  flex: none;
+  padding: var(--spacing-8) var(--spacing-8) 0;
+}
+.bs-tabbar--insp {
+  padding: 0 var(--spacing-4);
+}
+.bs-left__tabpanel:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* Fire units: one block per defence layer, meters side by side. */
+.bs-fl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-6);
+  padding-top: var(--spacing-8);
+  min-width: 0;
+}
+.bs-fl + .bs-fl {
+  border-top: var(--border-width-thin) solid var(--border-neutral-default);
+}
+.bs-fl__head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-6);
+  min-width: 0;
+}
+.bs-fl__tags {
+  display: flex;
+  gap: var(--spacing-4);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.bs-fl__meters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-12);
+  min-width: 0;
+}
+
+/* Active-tool bar on the map: one row, wrapping on a narrow map. */
+.bs-drawbar,
+.bs-drawbar__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-8);
+  min-width: 0;
+}
+.bs-drawbar__actions {
+  gap: var(--spacing-4);
+}
+
+/* Alerts filter row: severity and type dropdowns, match count at the end. */
+.bs-feedbar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-6);
+  padding: var(--spacing-8);
+  min-width: 0;
+}
+/* A severity tag keeps its full word; the title beside it ellipsises instead. */
+.bs-tag.bs-tag {
+  flex-shrink: 0;
+}
+.bs-feedbar__count {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* Facts: label over value, two columns; wide facts span both. */
+.bs-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-6);
+  padding: var(--spacing-8) var(--spacing-12);
+}
+.bs-facts--flush {
+  padding: 0;
+}
+.bs-facts + .bs-facts {
+  border-top: var(--border-width-thin) solid var(--border-neutral-default);
+}
+.bs-facts__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-8) var(--spacing-12);
+  margin: 0;
+}
+.bs-fact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  min-width: 0;
+}
+.bs-fact--wide {
+  grid-column: 1 / -1;
+}
+/* Wide facts carry the long values (notes, conditions): wrap them rather than clip. */
+.bs-fact--wide .bs-fact__value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.bs-fact__value {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bs-sourceline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-8);
+  padding: 0 var(--spacing-12);
+  min-width: 0;
+}
+
+/* FDS ScrollArea: className lands on the wrapper, viewportClassName on the scroller, and the
+   consumer owns the scroller's axis and bound (ScrollArea guard). */
+.bs-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.bs-scroll__viewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* ---------- map HUD positioning ---------- */
+.bs-hud {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-6);
+  pointer-events: none;
+  z-index: 2;
+}
+.bs-hud > * {
+  pointer-events: auto;
+}
+.bs-hud--tl {
+  top: var(--spacing-8);
+  left: var(--spacing-8);
+  /* Clear of the top-right toolbar (four button groups, 352px). */
+  right: calc(var(--spacing-64) * 5.5);
+  align-items: flex-start;
+}
+.bs-hud--tr {
+  top: var(--spacing-8);
+  right: var(--spacing-8);
+  align-items: flex-end;
+}
+.bs-hud--bl {
+  bottom: var(--spacing-8);
+  left: var(--spacing-8);
+}
+.bs-badges,
+.bs-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-6);
+}
+.bs-legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+.bs-legend__row {
+  display: grid;
+  grid-template-columns: calc(var(--spacing-64) + var(--spacing-8)) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--spacing-8);
+}
+
+/* ---------- inspector ---------- */
+.bs-insp {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.bs-insp__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-6);
+  padding: var(--spacing-8) var(--spacing-12);
+}
+.bs-insp__caption,
+.bs-insp__sechead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-8);
+  min-width: 0;
+}
+.bs-insp__title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  min-width: 0;
+}
+.bs-insp__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-4);
+}
+.bs-insp__foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-6);
+  padding: var(--spacing-8) var(--spacing-12);
+  border-top: var(--border-width-thin) solid var(--border-neutral-default);
+}
+.bs-insp__footbtns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--spacing-8);
+}
+.bs-hcard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-8);
+  min-width: 0;
+}
+.bs-hcard__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ---------- timeline ---------- */
+/* Transport and lanes share a row where the map is wide, and stack where it is not. */
+.bs-tl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-4) var(--spacing-16);
+  padding: var(--spacing-6) var(--spacing-12) var(--spacing-6);
+  min-width: 0;
+}
+.bs-tl__transport {
+  flex: 0 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-6);
+  min-width: 0;
+}
+.bs-tl__lanes {
+  /* 480px from the spacing scale: below that the lanes take their own row. */
+  flex: 1 1 calc(var(--spacing-64) * 7.5);
+  min-width: 0;
+  cursor: crosshair;
+  touch-action: none;
+  border-radius: var(--radius-s);
+}
+.bs-tl__lanes:focus-visible {
+  outline: var(--border-width-thick) solid var(--border-focused);
+  outline-offset: var(--spacing-2);
+}
+.bs-tl__lanes svg {
+  display: block;
+  user-select: none;
+}
+.bs-tl__frame {
+  cursor: pointer;
+}
+
+/* ---------- shared layout helpers ---------- */
+.bs-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+}
+.bs-stack--tight {
+  gap: var(--spacing-4);
+}
+.bs-pad {
+  padding: var(--spacing-8) var(--spacing-12);
+  margin: 0;
+}
+.bs-filter {
+  padding: var(--spacing-8);
+}
+.bs-fill {
+  flex: 1 1 auto;
+}
+.bs-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.bs-muted {
+  color: var(--text-neutral-muted);
+}
+.bs-num {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.bs-glyph {
+  display: block;
+  flex: none;
+}

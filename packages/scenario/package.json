@@ -1,0 +1,20 @@
+{
+  "name": "@me/scenario",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic, seeded synthetic scenarios. Jamnagar refinery air defence (notional).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "generate": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@me/engine-core": "workspace:*",
+    "@me/geo": "workspace:*",
+    "@me/journal-sqlite": "workspace:*",
+    "@me/schema": "workspace:*"
+  }
+}

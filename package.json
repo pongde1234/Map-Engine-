@@ -1,0 +1,29 @@
+{
+  "name": "map-engine",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Lattice-style common operating picture: entity journal, time travel, MIL-STD-2525 map, spatial rules.",
+  "type": "module",
+  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @me/server --filter @me/battlespace dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r --no-bail typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "scenario": "pnpm --filter @me/scenario generate",
+    "check:denylist": "node tools/checks/denylist.mjs",
+    "check": "pnpm typecheck && pnpm test && pnpm check:denylist"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "fast-check": "^4.10.2",
+    "playwright": "^1.64.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

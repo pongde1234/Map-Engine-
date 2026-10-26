@@ -1,0 +1,28 @@
+{
+  "name": "@me/map",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Imperative map engine: MapLibre basemap + deck.gl bands, layer plugins, tools, bookmarks.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./map.css": "./src/map.css"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@deck.gl/core": "^9.4.0",
+    "@deck.gl/extensions": "^9.4.0",
+    "@deck.gl/geo-layers": "^9.4.0",
+    "@deck.gl/layers": "^9.4.0",
+    "@deck.gl/maplibre": "^9.4.0",
+    "@me/client": "workspace:*",
+    "@me/geo": "workspace:*",
+    "@me/schema": "workspace:*",
+    "@me/symbology": "workspace:*",
+    "@protomaps/basemaps": "^5.7.2",
+    "maplibre-gl": "^6.15.0",
+    "pmtiles": "^4.5.0"
+  }
+}

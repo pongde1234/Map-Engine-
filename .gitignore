@@ -1,0 +1,29 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+.vite/
+playwright-report/
+test-results/
+
+# Generated data: journals, tiles, bundles (large; carried on removable media, not in git)
+data/journal/
+data/tiles/
+data/dem/
+data/bundle/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.pmtiles
+
+# Local secrets (signing keys, local identities)
+data/keys/
+data/identities.json
+
+# Offline tool binaries (vendored into the bundle, not git)
+data/bin/
+
+# Screenshots and one-off downloads
+data/shots/
+data/dl/

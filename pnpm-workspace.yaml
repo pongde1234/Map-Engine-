@@ -1,0 +1,15 @@
+packages:
+  - packages/*
+  - apps/*
+
+# Native modules we allow to run install scripts (air-gap: prebuilt binaries are vendored in the bundle).
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
+  msgpackr-extract: true
+
+autoInstallPeers: true
+strictPeerDependencies: false
+linkWorkspacePackages: true
+minimumReleaseAgeExclude:
+  - '@faclon-labs/fds@1.0.0'

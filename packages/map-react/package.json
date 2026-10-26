@@ -1,0 +1,25 @@
+{
+  "name": "@me/map-react",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "React bindings for the map engine: provider, MapView, hooks.",
+  "exports": {
+    ".": "./src/index.tsx"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@me/client": "workspace:*",
+    "@me/map": "workspace:*",
+    "@me/schema": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18 <20"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "react": "^19.3.1"
+  }
+}

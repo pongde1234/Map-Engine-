@@ -1,0 +1,21 @@
+/* Map chrome restyled with FDS tokens (attribution, scale). */
+.me-map {
+  position: absolute;
+  inset: 0;
+  background: var(--background-surface-moderate);
+}
+.me-map .maplibregl-ctrl-attrib,
+.me-map .maplibregl-ctrl-scale {
+  background: var(--background-surface-subtle);
+  color: var(--text-neutral-muted);
+  border-color: var(--border-neutral-default);
+}
+.me-map .maplibregl-ctrl-attrib a {
+  color: var(--text-neutral-muted);
+}
+.me-map .maplibregl-ctrl-attrib-button {
+  filter: none;
+}
+.me-map .maplibregl-canvas:focus-visible {
+  outline: var(--border-width-thin) solid var(--border-focused);
+}

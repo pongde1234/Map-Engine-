@@ -1,0 +1,173 @@
+/**
+ * Assistant: ask about the live picture. Built on the FDS AI kit (home, conversation,
+ * messages, tool calls, response, composer, suggestions). Until Bruce is connected through the
+ * Faclon adapter, answers come from the picture through fixed read-only tools, every call
+ * shown; the assistant never proposes targets or courses of action. Every answer is stamped
+ * with the picture time and the journal it read, and its citations open on the map. On the
+ * right, the standing decision questions with their live answerability; selecting one asks
+ * about it. Suggestions follow the picture.
+ */
+import { useEffect, useRef, useState } from 'react';
+import { ActionList, ActionListItem, ActionListItemBadge, Badge, Button, ScrollArea } from '@faclon-labs/fds';
+import { MapPinned } from 'lucide-react';
+import { formatZulu } from '@me/schema';
+import { AiComposer, AiConversation, AiHome, AiMessage, AiResponse, AiTool, type AiStatus, type AiSuggestion } from '@faclon-labs/fds/ai';
+import { useClient } from '@me/map-react';
+import { answer, decisionQuestions, raidLabel, shortHash, suggestionsFor, useDerived, useHealth, type Answer, type Answerability } from '@me/ui';
+
+interface Msg {
+  id: number;
+  role: 'user' | 'assistant';
+  text: string;
+  answer?: Answer;
+}
+
+
+const ANSWERABILITY: Record<Answerability, { color: 'Positive' | 'Notice' | 'Negative'; label: string }> = {
+  answerable: { color: 'Positive', label: 'ANSWERABLE' },
+  partial: { color: 'Notice', label: 'PARTIAL' },
+  unanswerable: { color: 'Negative', label: 'NOT ANSWERABLE' },
+};
+
+export function AssistantPage({ onOpenOnMap, pending, onPendingTaken }: { onOpenOnMap: (id: string) => void; pending?: string | null; onPendingTaken?: () => void }) {
+  const client = useClient();
+  const derived = useDerived(1000);
+  const health = useHealth();
+  const clock = client.scenario?.clock;
+  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [status, setStatus] = useState<AiStatus>('ready');
+  const [draft, setDraft] = useState('');
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const nextId = useRef(1);
+  // Answers that land after the page has gone are dropped; a development remount keeps them.
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  const ask = (text: string) => {
+    const q = text.trim();
+    if (!q || status === 'submitted' || status === 'streaming') return;
+    setMsgs((m) => [...m, { id: nextId.current++, role: 'user', text: q }]);
+    setDraft('');
+    setStatus('submitted');
+    // The tools read the picture as it stands when the answer is composed.
+    timer.current = setTimeout(() => {
+      if (!alive.current) return;
+      const a = answer(q, client, derived);
+      setMsgs((m) => [...m, { id: nextId.current++, role: 'assistant', text: a.text, answer: a }]);
+      setStatus('ready');
+    }, 450);
+  };
+  const stop = () => {
+    clearTimeout(timer.current);
+    setStatus('ready');
+  };
+  // A question handed over from the map ("Ask the assistant" on a selected object).
+  const taken = useRef<string | null>(null);
+  useEffect(() => {
+    // Once per hand-over, even when effects run twice (development StrictMode).
+    if (!pending || taken.current === pending) return;
+    taken.current = pending;
+    onPendingTaken?.();
+    ask(pending);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending]);
+  // Suggestions follow the picture: saturation, a contested track, a stale input.
+  const suggestions: AiSuggestion[] = suggestionsFor(client, derived).map((label, i) => ({ id: `s${i}`, label }));
+
+  const composer = (
+    <AiComposer
+      onSubmit={({ text }) => ask(text)}
+      onStop={stop}
+      status={status}
+      value={draft}
+      onChange={setDraft}
+      placeholder="Ask about tracks, feeds, freshness, fire units or a decision question"
+      accessibilityLabel="Ask the assistant"
+    />
+  );
+  const questions = decisionQuestions(client, derived);
+
+  return (
+    <div className="as">
+      <section className="as__main" aria-label="Conversation">
+        <div className="as__bar">
+          <span className="BodySmallSemibold">Decision System Assistant</span>
+          <Badge size="Small" color="Neutral" emphasis="Subtle" label="ADAPTER STUB" />
+          <Badge size="Small" color="Neutral" emphasis="Subtle" label="READ-ONLY · ASSIST ONLY" />
+          <span className="bs-fill" />
+          <Button size="xs" variant="secondary" tone="neutral" isDisabled={!msgs.length} onClick={() => (stop(), setMsgs([]))}>
+            New conversation
+          </Button>
+        </div>
+        {msgs.length ? (
+          <>
+            <AiConversation status={status} accessibilityLabel="Conversation with the assistant" className="as__conversation">
+              {msgs.map((m) =>
+                m.role === 'user' ? (
+                  <AiMessage key={m.id} role="user">
+                    {m.text}
+                  </AiMessage>
+                ) : (
+                  <AiMessage key={m.id} role="assistant">
+                    {m.answer?.tools.map((tc, i) => <AiTool key={i} name={tc.name} state="output-available" input={tc.input} output={tc.output} inputLabel="Query" outputLabel="Picture" />)}
+                    <AiResponse>{m.text}</AiResponse>
+                    {m.answer ? (
+                      <div className="as__cite">
+                        {m.answer.cites.map((id) => (
+                          <Button key={id} size="xs" variant="secondary" tone="neutral" leadingIcon={<MapPinned size={14} />} onClick={() => onOpenOnMap(id)}>
+                            {id}
+                          </Button>
+                        ))}
+                        <span className="BodyXSmallRegular bs-muted bs-num">
+                          Picture as of {clock ? raidLabel(m.answer.asOf, clock) : ''} · {formatZulu(m.answer.asOf).slice(0, 5)}Z{health ? ` · journal ${health.records.toLocaleString('en')} records · root ${shortHash(health.head.hash)}` : ''}
+                        </span>
+                      </div>
+                    ) : null}
+                  </AiMessage>
+                ),
+              )}
+            </AiConversation>
+            <div className="as__composer">{composer}</div>
+          </>
+        ) : (
+          <AiHome
+            heading="Ask about the live picture"
+            composer={composer}
+            suggestions={suggestions}
+            onSuggestionPick={(s) => ask(s.label)}
+            footnote="Answers come from the picture at the time on screen through read-only tools, and each call is shown. The assistant never proposes targets or courses of action. Bruce connects through the Faclon adapter."
+            className="as__home"
+          />
+        )}
+      </section>
+      <aside className="as__side" aria-label="Decision questions">
+        <div className="as__sidehead">
+          <span className="BodyXSmallSemibold">DECISION QUESTIONS</span>
+          <span className="BodyXSmallRegular bs-muted">Live from the picture. Select one to ask the assistant.</span>
+        </div>
+        <ScrollArea className="bs-scroll" viewportClassName="bs-scroll__viewport">
+          <ActionList accessibilityLabel="Decision questions">
+            {questions.map((d) => {
+              const a = ANSWERABILITY[d.answerability];
+              return (
+                <ActionListItem
+                  key={d.id}
+                  value={d.id}
+                  title={`${d.id} ${d.title}`}
+                  description={`${d.metric} · worst input ${d.worst}`}
+                  titleSuffix={<ActionListItemBadge className="bs-tag" color={a.color} emphasis="Subtle" label={a.label} />}
+                  onClick={() => ask(`Is ${d.id} ${d.title.toLowerCase()} answerable now?`)}
+                />
+              );
+            })}
+          </ActionList>
+        </ScrollArea>
+      </aside>
+    </div>
+  );
+}
