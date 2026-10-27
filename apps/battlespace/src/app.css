@@ -109,11 +109,10 @@ body {
   /* Aligned with the card edges below. */
   padding: var(--spacing-12) var(--spacing-12) var(--spacing-4);
 }
-/* The stage on the left, its count at the right edge. */
+/* The stage badge, at its own width (the column's count is in its accessible name only). */
 .tb__coltitle {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--spacing-8);
 }
 /* The gate and hint: up to two lines, always two lines tall, so every column's cards start level. */

@@ -232,13 +232,10 @@ export function TargetsPage({ presenter, onOpenOnMap }: { presenter: Presenter; 
               const items = shown.filter((x) => x.stage === st.id);
               const p = (k: 'P1' | 'P2' | 'P3') => items.filter((x) => x.priority === k).length;
               return (
-                <section key={st.id} className="tb__col" aria-label={st.label}>
+                <section key={st.id} className="tb__col" aria-label={`${st.label}, ${items.length} targets`}>
                   <div className="tb__colhead">
                     <span className="tb__coltitle">
                       <Badge size="Medium" color={STAGE_TONE[st.id].badge} emphasis="Intense" label={st.label.toUpperCase()} />
-                      <span className="BodySmallMedium bs-num" aria-label={`${items.length} targets`}>
-                        {items.length}
-                      </span>
                     </span>
                     <span className="BodyXSmallRegular bs-muted tb__colgate">{BY_PRIORITY.has(st.id) && items.length ? `${st.gate} · P1 ${p('P1')} · P2 ${p('P2')} · P3 ${p('P3')}` : `${st.gate} · ${st.hint}`}</span>
                   </div>
