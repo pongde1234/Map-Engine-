@@ -33,13 +33,6 @@ export function ruleBadge(p: RuleFirePayload, fenceName?: string): string {
   return `${RULE_WORDS[p.rule]}${v}`;
 }
 
-/** A fired rule split into its name and figures, for a row: "Saturation" with 24 against 14. */
-export function ruleParts(p: RuleFirePayload, fenceName?: string): { name: string; value?: number; threshold?: string | number } {
-  if (p.rule === 'geofence') return { name: fenceName ?? p.note ?? RULE_WORDS.geofence, value: p.value ?? 0 };
-  if (p.rule === 'custom') return { name: p.note ?? RULE_WORDS.custom };
-  return { name: RULE_WORDS[p.rule], ...(p.value !== undefined ? { value: p.value } : {}), ...(p.threshold !== undefined ? { threshold: p.threshold } : {}) };
-}
-
 /** One-line summary of a discrete record for feeds and lanes. */
 export function eventSummary(r: JournalRecord): { title: string; detail: string; subject?: string } {
   switch (r.kind) {

@@ -9,7 +9,6 @@ export * from './EventFeed.tsx';
 export * from './Inspector.tsx';
 export * from './FireUnits.tsx';
 export * from './Rings.tsx';
-export * from './RulesFired.tsx';
 export * from './RaidGroups.tsx';
 export * from './magazine.ts';
 export * from './Section.tsx';

@@ -5,8 +5,9 @@
  *    recent activity) · Provenance (source and registration, source, time, record) · Intel
  *    (reported evidence) · Links (linked objects, lineage thread) · Activity. Everything else:
  *    Overview (its own facts) · Provenance · Links · Activity. Actions pin to the foot.
- *  - Nothing selected: theatre summary — hostile tracks per ring (Rings), rules fired (RulesFired),
- *    raid groups (RaidGroups), fire units by defence layer (FireUnits).
+ *  - Nothing selected: theatre summary — hostile tracks per ring (Rings), raid groups
+ *    (RaidGroups), fire units by defence layer (FireUnits). Rule firings are in the Alerts feed
+ *    and on the timeline.
  */
 import {
   ActionList,
@@ -34,7 +35,6 @@ import { useClient, useEngineTime, useEvents, useLineage, useSelectedEntity, use
 import { SymbolGlyph } from './glyphs.tsx';
 import { FireUnits } from './FireUnits.tsx';
 import { Rings } from './Rings.tsx';
-import { RulesFired } from './RulesFired.tsx';
 import { RaidGroups } from './RaidGroups.tsx';
 import { MAG_COLOR, magState } from './magazine.ts';
 import { Facts, type Fact } from './Facts.tsx';
@@ -589,7 +589,6 @@ function TheatreSummary({ derived }: { derived: Derived }) {
     <ScrollArea className="bs-scroll" viewportClassName="bs-scroll__viewport">
       <div className="bs-divided">
         <Rings rings={derived.rings} channels={threshold} />
-        <RulesFired rules={derived.activeRules} />
         <RaidGroups groups={derived.groups} />
         <FireUnits effectors={derived.effectors} />
       </div>
