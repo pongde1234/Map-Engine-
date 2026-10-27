@@ -47,16 +47,18 @@ export interface ProcessUnitDef {
   tier: 1 | 2 | 3;
   at: LonLat;
   halfSizeM: number;
+  /** RIL-reviewed vulnerability rank, set in phase 0 (synthetic; 1 = most vulnerable). */
+  rank: number;
 }
 
 /** Generic process units only (no unit-level operating sequences). */
 export const PROCESS_UNITS: ProcessUnitDef[] = [
-  { id: 'PU-CDU', name: 'Crude unit', tier: 1, at: [69.852, 22.364], halfSizeM: 260 },
-  { id: 'PU-FCC', name: 'Catalytic cracker', tier: 1, at: [69.867, 22.356], halfSizeM: 240 },
-  { id: 'PU-HCU', name: 'Hydrocracker', tier: 1, at: [69.876, 22.367], halfSizeM: 200 },
-  { id: 'PU-UTL', name: 'Utilities', tier: 1, at: [69.881, 22.351], halfSizeM: 180 },
-  { id: 'PU-TNK', name: 'Tank farm', tier: 2, at: [69.838, 22.349], halfSizeM: 420 },
-  { id: 'PU-JTY', name: 'Marine jetty', tier: 2, at: [69.83, 22.44], halfSizeM: 150 },
+  { id: 'PU-CDU', name: 'Crude unit', tier: 1, at: [69.852, 22.364], halfSizeM: 260, rank: 1 },
+  { id: 'PU-FCC', name: 'Catalytic cracker', tier: 1, at: [69.867, 22.356], halfSizeM: 240, rank: 2 },
+  { id: 'PU-HCU', name: 'Hydrocracker', tier: 1, at: [69.876, 22.367], halfSizeM: 200, rank: 3 },
+  { id: 'PU-UTL', name: 'Utilities', tier: 1, at: [69.881, 22.351], halfSizeM: 180, rank: 4 },
+  { id: 'PU-TNK', name: 'Tank farm', tier: 2, at: [69.838, 22.349], halfSizeM: 420, rank: 5 },
+  { id: 'PU-JTY', name: 'Marine jetty', tier: 2, at: [69.83, 22.44], halfSizeM: 150, rank: 6 },
 ];
 
 export interface SensorDef {

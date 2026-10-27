@@ -2,6 +2,7 @@
  * Received alerts and events (newest first): fragments, decisions, rule firings, engagements,
  * BDA. Only what has been received by the current time is listed (bitemporal). Filter by
  * severity (all · medium and up · high and up) and by type; each row carries its severity.
+ * The operator's custom alerts sit above the feed; "New alert" sets one (AlertRules.tsx).
  */
 import { useState } from 'react';
 import {
@@ -15,11 +16,12 @@ import {
   DropdownMenuTrigger,
   ScrollArea,
 } from '@faclon-labs/fds';
-import { ChevronDown, Crosshair, FileSearch, Gavel, ShieldAlert, TriangleAlert, Wrench } from 'lucide-react';
+import { BellPlus, ChevronDown, Crosshair, FileSearch, Gavel, ShieldAlert, TriangleAlert, Wrench } from 'lucide-react';
 import type { JournalRecord } from '@me/schema';
 import { useClient, useEvents, useView, useViewStore } from '@me/map-react';
 import { eventSummary, raidLabel } from './format.ts';
 import { ALERT_TYPES, SEVERITY_RANK, severityOf, type Severity } from './severity.ts';
+import { AlertRuleModal, CustomAlertList } from './AlertRules.tsx';
 
 const ICON = {
   fragment: FileSearch,
@@ -75,8 +77,10 @@ export function EventFeed({ limit = 200 }: { limit?: number }) {
   const view = useViewStore();
   const selected = useView((s) => s.selected);
   const [filter, setFilter] = useAlertFilter();
+  // The custom-alert dialog: a new alert (id null) or one to review and withdraw.
+  const [alertDialog, setAlertDialog] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
 
-  const kinds = filter.types.length ? new Set(ALERT_TYPES.filter((x) => filter.types.includes(x.id)).flatMap((x) => x.kinds)) : null;
+  const types = filter.types.length ? ALERT_TYPES.filter((x) => filter.types.includes(x.id)) : null;
   const floor = SEVERITY_RANK[filter.min];
   const list: Array<{ r: JournalRecord; sev: Severity }> = [];
   let received = 0;
@@ -86,7 +90,7 @@ export function EventFeed({ limit = 200 }: { limit?: number }) {
     // Engagement noise: launches are implied by the assignment and the result.
     if (r.kind === 'engagement' && (r.payload as { result: string }).result === 'launched') continue;
     received++;
-    if (kinds && !kinds.has(r.kind)) continue;
+    if (types && !types.some((x) => x.kinds.includes(r.kind) && (!x.match || x.match(r)))) continue;
     const sev = severityOf(r);
     if (SEVERITY_RANK[sev] < floor) continue;
     matching++;
@@ -122,7 +126,7 @@ export function EventFeed({ limit = 200 }: { limit?: number }) {
           <DropdownMenuOverlay placement="bottom-start">
             <ActionList accessibilityLabel="Alert types">
               {ALERT_TYPES.map((x) => (
-                <ActionListItem key={x.id} value={x.id} title={x.label} leading={<ActionListItemIcon icon={ICON[x.kinds[0] as keyof typeof ICON] ?? FileSearch} />} />
+                <ActionListItem key={x.id} value={x.id} title={x.label} leading={<ActionListItemIcon icon={x.id === 'custom' ? BellPlus : (ICON[x.kinds[0] as keyof typeof ICON] ?? FileSearch)} />} />
               ))}
             </ActionList>
           </DropdownMenuOverlay>
@@ -132,6 +136,7 @@ export function EventFeed({ limit = 200 }: { limit?: number }) {
         </span>
       </div>
       <ScrollArea className="bs-scroll" viewportClassName="bs-scroll__viewport">
+        <CustomAlertList onOpen={(id) => setAlertDialog({ open: true, id })} />
         {list.length ? (
           <ActionList accessibilityLabel="Received alerts and events">
             {list.map(({ r, sev }) => {
@@ -157,6 +162,12 @@ export function EventFeed({ limit = 200 }: { limit?: number }) {
           <p className="BodySmallRegular bs-muted bs-pad">{received ? 'No alerts match the filter.' : 'No alerts received yet.'}</p>
         )}
       </ScrollArea>
+      <div className="bs-insp__foot">
+        <Button size="sm" variant="secondary" tone="neutral" isFullWidth leadingIcon={<BellPlus size={14} />} onClick={() => setAlertDialog({ open: true, id: null })}>
+          New custom alert
+        </Button>
+      </div>
+      <AlertRuleModal isOpen={alertDialog.open} alertId={alertDialog.id} onClose={() => setAlertDialog({ open: false, id: null })} />
     </>
   );
 }

@@ -101,6 +101,8 @@ export class Emitter {
       thread_id?: string;
       releasability?: string[];
       author?: string;
+      /** A label other than the demo default (e.g. a rehearsal record). */
+      label?: string;
     },
   ): string {
     this.n += 1;
@@ -112,7 +114,7 @@ export class Emitter {
       source_time: Math.round(o.source_time),
       ingest_time: Math.round(o.ingest_time ?? o.source_time),
       provenance: o.provenance,
-      label: DEFAULT_LABEL,
+      label: o.label ?? DEFAULT_LABEL,
       payload: o.payload,
     };
     if (o.entity_id) d.entity_id = o.entity_id;

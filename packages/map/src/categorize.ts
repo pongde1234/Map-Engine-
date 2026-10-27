@@ -24,6 +24,11 @@ export type LayerKey =
   | 'command.other'
   | 'reference.vp';
 
+/** The visibility key of an operator layer (its own row under Command). */
+export function operatorLayerKey(id: string): string {
+  return `command.operator.${id}`;
+}
+
 export function categorize(e: Entity): LayerKey {
   const tpl = e.ontology?.template;
   const cls = e.ontology?.class ?? '';

@@ -2,11 +2,14 @@
  * Presenter flow: storyboard frames stepped from any page (`[` `]`, or PgUp/PgDn from a
  * clicker) and the `?bm=` / `?t=` / `?sel=` deep links. A frame seeks the time, sets the
  * selection and opens its page; the map's camera applies once the map page has its engine
- * (`pending`), so a frame on another page (A4, the Strategic View) steps like any other.
+ * (`pending`), so a frame on another page (A2, the Ontology Explorer) steps like any other.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Bookmark, MapClient, ViewStore } from '@me/client';
 import { storyboardBookmarks } from './bookmarks.ts';
+
+/** The frame whose time the console opens at, and the board falls back to when it is empty. */
+export const DEMO_FRAME = 'B4';
 
 export interface Presenter {
   bookmarks: Bookmark[];
@@ -67,12 +70,18 @@ export function usePresenter(client: MapClient, view: ViewStore, setPage: (page:
 
   // Deep links (Target Board "Compare on map", evidence packs) apply once the scenario is known,
   // then leave the URL, so returning to a page keeps the operator's own time and selection.
+  // Without one, the console opens at the demo position (frame B4's time, H-15): the busiest
+  // moment of the synthetic raid, so every page and panel has data from the first screen.
   const [linked, setLinked] = useState(false);
   useEffect(() => {
     if (linked || !s) return;
     setLinked(true);
     const q = new URLSearchParams(location.search);
-    if (![...q.keys()].some((k) => k === 'bm' || k === 't' || k === 'sel')) return;
+    if (![...q.keys()].some((k) => k === 'bm' || k === 't' || k === 'sel')) {
+      const demo = bookmarks.find((b) => b.id === DEMO_FRAME);
+      if (demo) client.seek(demo.t);
+      return;
+    }
     const b = q.get('bm') ? bookmarks.find((x) => x.id === q.get('bm')) : undefined;
     if (b) go(b);
     else if (q.get('t')) client.seek(Number(q.get('t')));

@@ -14,7 +14,7 @@ import type { MapClient } from '@me/client';
 import type { Atlas } from '@me/symbology';
 import type { MapTheme, RGBA } from './theme.ts';
 import { alpha } from './theme.ts';
-import type { LayerKey } from './categorize.ts';
+import { operatorLayerKey, type LayerKey } from './categorize.ts';
 import type { DrawState, SketchMeasure } from './draw.ts';
 
 export interface AreaItem {
@@ -30,6 +30,8 @@ export interface AreaItem {
   stroke: RGBA;
   dashed: boolean;
   width: number;
+  /** Operator objects: the operator layer it sits in, whose own toggle shows or hides it. */
+  layer?: string;
 }
 
 export interface TrackItem {
@@ -43,7 +45,19 @@ export interface TrackItem {
   label: string;
   hostile: boolean;
   size: number;
+  /** Context traffic (civil air, AIS) outside R3, drawn quietly unless selected or hovered. */
+  dim: boolean;
 }
+
+/** One raid group drawn as a single marker with its member count (theatre zoom). */
+export interface GroupMarker {
+  id: string;
+  pos: [number, number];
+  count: number;
+}
+
+/** Below this zoom a raid group is one marker with its count; its hostile tracks hide. */
+export const GROUP_ZOOM = 7;
 
 export interface FrameCtx {
   theme: MapTheme;
@@ -69,7 +83,10 @@ export function areaFor(e: Entity, key: LayerKey, theme: MapTheme): AreaItem | n
   if (!shape) return null;
   const r = theme.rgba;
   const gd = e.geo_details;
-  let fill: RGBA = alpha(r.info, 0);
+  // A restrained palette: neutral by default, amber for warnings, red only for threats; blue is
+  // kept for selection. Fills show only on hover or selection (areaLayers), so these are the
+  // colours an area takes when it is looked at.
+  let fill: RGBA = alpha(r.lineStrong, 0);
   let stroke: RGBA = alpha(r.lineStrong, 200);
   let dashed = false;
   let width = 1;
@@ -78,24 +95,27 @@ export function areaFor(e: Entity, key: LayerKey, theme: MapTheme): AreaItem | n
       stroke = alpha(r.textSubtle, 140);
       dashed = gd?.ring !== 'R4';
       break;
-    case 'command.wcs':
-      fill = alpha(gd?.wcs === 'free' ? r.negative : gd?.wcs === 'tight' ? r.notice : r.positive, 22);
-      stroke = alpha(gd?.wcs === 'free' ? r.negative : gd?.wcs === 'tight' ? r.notice : r.positive, 150);
-      dashed = true;
+    case 'command.wcs': {
+      // Weapons free and tight are warnings (amber, solid and dashed); hold is neutral.
+      const tone = gd?.wcs === 'hold' ? r.lineStrong : r.notice;
+      fill = alpha(tone, 22);
+      stroke = alpha(tone, gd?.wcs === 'hold' ? 170 : 160);
+      dashed = gd?.wcs !== 'free';
       break;
+    }
     case 'command.restrictions':
-      fill = alpha(gd?.status === 'expired' ? r.notice : r.info, 26);
-      stroke = alpha(gd?.status === 'expired' ? r.notice : r.info, 170);
+      fill = alpha(r.lineStrong, 22);
+      stroke = alpha(r.lineStrong, 190);
       dashed = gd?.status !== 'active';
       break;
     case 'command.pickets':
-      fill = alpha(r.zoneInfo, 30);
-      stroke = alpha(r.zoneInfo, 210);
+      fill = alpha(r.lineStrong, 24);
+      stroke = alpha(r.lineStrong, 200);
       width = 1.5;
       break;
     case 'command.softkill':
-      fill = alpha(r.brand, 26);
-      stroke = alpha(r.brand, 150);
+      fill = alpha(r.textSubtle, 22);
+      stroke = alpha(r.textSubtle, 150);
       dashed = true;
       break;
     case 'command.aimpoints':
@@ -104,23 +124,19 @@ export function areaFor(e: Entity, key: LayerKey, theme: MapTheme): AreaItem | n
       width = 1.5;
       break;
     case 'command.axes':
-      stroke = alpha(r.negative, 200);
-      width = 2;
+      stroke = alpha(r.negative, 150);
+      width = 1.5;
       dashed = true;
       break;
     case 'command.operator':
-      // Geofences in the notice tone, operator NFZs in negative, everything else in focus blue.
-      if (gd?.type === 'geofence') {
+      // Geofences and operator NFZs are warnings; other operator objects are neutral.
+      if (gd?.type === 'geofence' || gd?.type === 'nfz') {
         fill = alpha(r.notice, 20);
         stroke = alpha(r.notice, 230);
         dashed = true;
-      } else if (gd?.type === 'nfz') {
-        fill = alpha(r.negative, 20);
-        stroke = alpha(r.negative, 210);
-        dashed = true;
       } else {
-        fill = alpha(r.focus, 16);
-        stroke = alpha(r.focus, 230);
+        fill = alpha(r.text, 16);
+        stroke = alpha(r.text, 210);
       }
       width = 1.5;
       break;
@@ -237,22 +253,36 @@ export function declutter<T>(
 }
 
 export function areaLayers(areas: AreaItem[], ctx: FrameCtx): Layer[] {
-  const vis = areas.filter((a) => ctx.visible[a.key] !== false);
+  // An object in an operator layer follows that layer's toggle; once the layer is withdrawn it
+  // falls back to "Operator objects".
+  const vis = areas.filter((a) => (a.layer && ctx.client.entities.has(a.layer) ? ctx.visible[operatorLayerKey(a.layer)] !== false : ctx.visible[a.key] !== false));
   const polys = vis.filter((a) => a.polygons.length);
   const lines = vis.filter((a) => a.line);
   const points = vis.filter((a) => a.point);
   const dash = new PathStyleExtension({ dash: true });
+  // Labels on demand: the area hovered or selected, or every area once zoomed in.
+  const labels = declutter(
+    vis.filter((a) => a.label && a.labelAt && (a.id === ctx.selected || a.id === ctx.hovered || ctx.zoom >= labelZoom(a.key))),
+    (a) => a.labelAt!,
+    (a) => a.label!,
+    (a) => (a.id === ctx.selected ? 10 : a.id === ctx.hovered ? 9 : a.key === 'fused.groups' ? 5 : a.key === 'command.aimpoints' ? 4 : a.key === 'command.rings' ? 3 : 1),
+    ctx.project,
+    0,
+    ctx.placed,
+  );
   return [
+    // Areas are outlines; the fill shows only on the area hovered or selected. Every polygon
+    // stays in this layer at a near-zero alpha, since the fill is what makes an area pickable.
     new PolygonLayer<AreaItem>({
       id: 'areas-fill',
       data: polys,
       ...before(ctx),
       getPolygon: (a) => a.polygons,
-      getFillColor: (a) => (a.id === ctx.selected ? alpha(a.fill, Math.min(255, a.fill[3] + 40)) : a.fill),
+      getFillColor: (a) => (a.id === ctx.selected ? alpha(a.fill, Math.min(255, a.fill[3] + 40)) : a.id === ctx.hovered ? a.fill : alpha(a.fill, 1)),
       stroked: false,
       filled: true,
       pickable: true,
-      updateTriggers: { getFillColor: [ctx.selected, ctx.theme] },
+      updateTriggers: { getFillColor: [ctx.selected, ctx.hovered, ctx.theme] },
     }) as unknown as Layer,
     new PathLayer<{ a: AreaItem; path: LonLat[] }>({
       id: 'areas-stroke',
@@ -291,39 +321,72 @@ export function areaLayers(areas: AreaItem[], ctx: FrameCtx): Layer[] {
       pickable: true,
       updateTriggers: { getRadius: [ctx.selected], getLineColor: [ctx.selected, ctx.theme] },
     }) as unknown as Layer,
-    new TextLayer<AreaItem>({
-      id: 'areas-labels',
-      data: declutter(
-        vis.filter((a) => a.label && a.labelAt && ctx.zoom >= labelZoom(a.key)),
-        (a) => a.labelAt!,
-        (a) => a.label!,
-        (a) => (a.key === 'fused.groups' ? 5 : a.key === 'command.rings' ? 3 : a.key === 'command.aimpoints' ? 4 : 1),
-        ctx.project,
-        0,
-        ctx.placed,
-      ),
-      getPosition: (a) => a.labelAt!,
-      getText: (a) => a.label!,
-      getPixelOffset: (a) => (a.point ? [9, 0] : [0, 0]),
-      getSize: 11,
-      getColor: (a) => alpha(a.stroke, 235),
-      fontFamily: 'JetBrains Mono Variable, JetBrains Mono, monospace',
-      fontWeight: 500,
-      characterSet: 'auto',
-      getTextAnchor: 'start',
-      getAlignmentBaseline: 'center',
-      outlineWidth: 3,
-      outlineColor: alpha(ctx.theme.rgba.sunken, 230),
-      fontSettings: { sdf: true, fontSize: 48, buffer: 6 },
-    }) as unknown as Layer,
+    // No label layer when nothing is labelled: an empty 'auto' character set gives the text
+    // layer an empty font atlas, which WebGL rejects.
+    ...(labels.length
+      ? [
+          new TextLayer<AreaItem>({
+            id: 'areas-labels',
+            data: labels,
+            getPosition: (a) => a.labelAt!,
+            getText: (a) => a.label!,
+            getPixelOffset: (a) => (a.point ? [9, 0] : [0, 0]),
+            getSize: 11,
+            getColor: (a) => alpha(a.stroke, 235),
+            fontFamily: 'JetBrains Mono Variable, JetBrains Mono, monospace',
+            fontWeight: 500,
+            characterSet: 'auto',
+            getTextAnchor: 'start',
+            getAlignmentBaseline: 'center',
+            outlineWidth: 3,
+            outlineColor: alpha(ctx.theme.rgba.sunken, 230),
+            fontSettings: { sdf: true, fontSize: 48, buffer: 6 },
+          }) as unknown as Layer,
+        ]
+      : []),
   ];
 }
 
+/** The zoom from which an area's label shows without hovering it. */
 function labelZoom(key: LayerKey): number {
-  if (key === 'fused.groups') return 5;
   if (key === 'reference.vp') return 11;
   if (key === 'command.aimpoints') return 9;
-  return 6;
+  return 9.5;
+}
+
+/** Raid groups at theatre zoom: one marker per group with its member count. */
+export function groupMarkerLayers(markers: GroupMarker[], ctx: FrameCtx): Layer[] {
+  const r = ctx.theme.rgba;
+  return [
+    new ScatterplotLayer<GroupMarker>({
+      id: 'group-markers',
+      data: markers,
+      getPosition: (d) => d.pos,
+      getRadius: (d) => (d.id === ctx.selected || d.id === ctx.hovered ? 13 : 11),
+      radiusUnits: 'pixels',
+      getFillColor: alpha(r.negative, 230),
+      getLineColor: (d) => (d.id === ctx.selected ? r.focus : alpha(r.sunken, 255)),
+      lineWidthUnits: 'pixels',
+      getLineWidth: (d) => (d.id === ctx.selected ? 2 : 1.5),
+      stroked: true,
+      pickable: true,
+      updateTriggers: { getRadius: [ctx.selected, ctx.hovered], getLineColor: [ctx.selected, ctx.theme], getLineWidth: [ctx.selected] },
+    }) as unknown as Layer,
+    new TextLayer<GroupMarker>({
+      id: 'group-counts',
+      data: markers,
+      getPosition: (d) => d.pos,
+      getText: (d) => String(d.count),
+      getSize: 11,
+      getColor: alpha(r.sunken, 255),
+      getTextAnchor: 'middle',
+      getAlignmentBaseline: 'center',
+      fontFamily: 'Inter Variable, Inter, sans-serif',
+      fontWeight: 600,
+      characterSet: '0123456789',
+      fontSettings: { sdf: true, fontSize: 48, buffer: 6 },
+    }) as unknown as Layer,
+  ];
 }
 
 export function trackLayers(items: TrackItem[], ctx: FrameCtx): Layer[] {
@@ -335,21 +398,21 @@ export function trackLayers(items: TrackItem[], ctx: FrameCtx): Layer[] {
     a === 'aging' ? r.zoneWarning : a === 'stale' ? r.zoneCritical : a === 'disc' ? r.zoneUnknown : r.zoneNormal;
 
   if (ctx.visible['track.trails'] !== false) {
-    const trails: Array<{ id: string; path: number[][]; hostile: boolean }> = [];
+    const trails: Array<{ id: string; path: number[][]; hostile: boolean; dim: boolean }> = [];
     for (const it of items) {
       const tr = ctx.client.trails.get(it.id);
       if (!tr || tr.length < 6) continue;
       const path: number[][] = [];
       for (let i = 0; i < tr.length; i += 3) path.push([tr[i]!, tr[i + 1]!]);
       path.push([it.pos[0], it.pos[1]]);
-      trails.push({ id: it.id, path, hostile: it.hostile });
+      trails.push({ id: it.id, path, hostile: it.hostile, dim: it.dim });
     }
     out.push(
       new PathLayer<(typeof trails)[number]>({
         id: 'track-trails',
         data: trails,
         getPath: (d) => d.path as unknown as LonLat[],
-        getColor: (d) => alpha(d.hostile ? r.negative : r.textSubtle, 90),
+        getColor: (d) => alpha(d.hostile ? r.negative : r.textSubtle, d.dim ? 40 : 90),
         getWidth: 1,
         widthUnits: 'pixels',
         capRounded: true,
@@ -417,7 +480,8 @@ export function trackLayers(items: TrackItem[], ctx: FrameCtx): Layer[] {
         getPosition: (d) => (pitched ? [d.pos[0], d.pos[1], d.pos[2] * 6] : [d.pos[0], d.pos[1]]),
         getSize: (d) => d.size,
         sizeUnits: 'pixels',
-        getColor: (d) => [255, 255, 255, d.age === 'stale' ? 120 : d.age === 'disc' ? 90 : 255],
+        // The RGB is ignored (the symbol carries its 2525 colours); alpha says old or context.
+        getColor: (d) => [255, 255, 255, Math.min(d.age === 'stale' ? 120 : d.age === 'disc' ? 90 : 255, d.dim ? 130 : 255)],
         pickable: true,
         billboard: true,
         alphaCutoff: 0.02,
@@ -446,9 +510,12 @@ export function trackLayers(items: TrackItem[], ctx: FrameCtx): Layer[] {
     );
   }
 
+  // As with area labels, no layer when nothing is labelled (an empty font atlas).
   if (ctx.visible['track.labels'] !== false) {
-    // Installations are labelled by their area; symbols only label tracks and assets.
-    const candidates = items.filter((i) => i.key !== 'reference.vp' && (i.id === ctx.selected || i.id === ctx.hovered || (ctx.zoom >= 8.5 && i.label) || (i.hostile && ctx.zoom >= 7.5)));
+    // Installations are labelled by their area; symbols only label tracks and assets. Labels on
+    // demand: the track selected or hovered, or every labelled track once zoomed in (context
+    // traffic stays unlabelled).
+    const candidates = items.filter((i) => i.key !== 'reference.vp' && (i.id === ctx.selected || i.id === ctx.hovered || (ctx.zoom >= 9 && i.label && !i.dim)));
     const labelled = declutter(
       candidates,
       (d) => [d.pos[0], d.pos[1]],
@@ -458,25 +525,27 @@ export function trackLayers(items: TrackItem[], ctx: FrameCtx): Layer[] {
       12,
       ctx.placed,
     );
-    out.push(
-      new TextLayer<TrackItem>({
-        id: 'track-labels',
-        data: labelled,
-        getPosition: (d) => [d.pos[0], d.pos[1]],
-        getText: (d) => d.label,
-        getSize: 11,
-        getColor: (d) => (d.hostile ? r.text : alpha(r.textSubtle, 235)),
-        getPixelOffset: (d) => [d.size * 0.65, 0],
-        getTextAnchor: 'start',
-        getAlignmentBaseline: 'center',
-        fontFamily: 'JetBrains Mono Variable, JetBrains Mono, monospace',
-        fontWeight: 500,
-        outlineWidth: 3,
-        outlineColor: alpha(r.sunken, 235),
-        fontSettings: { sdf: true, fontSize: 48, buffer: 6 },
-        characterSet: 'auto',
-      }) as unknown as Layer,
-    );
+    if (labelled.length) {
+      out.push(
+        new TextLayer<TrackItem>({
+          id: 'track-labels',
+          data: labelled,
+          getPosition: (d) => [d.pos[0], d.pos[1]],
+          getText: (d) => d.label,
+          getSize: 11,
+          getColor: (d) => (d.hostile ? r.text : alpha(r.textSubtle, 235)),
+          getPixelOffset: (d) => [d.size * 0.65, 0],
+          getTextAnchor: 'start',
+          getAlignmentBaseline: 'center',
+          fontFamily: 'JetBrains Mono Variable, JetBrains Mono, monospace',
+          fontWeight: 500,
+          outlineWidth: 3,
+          outlineColor: alpha(r.sunken, 235),
+          fontSettings: { sdf: true, fontSize: 48, buffer: 6 },
+          characterSet: 'auto',
+        }) as unknown as Layer,
+      );
+    }
   }
 
   // Selection / hover rings on top.
@@ -578,9 +647,20 @@ export function symbolSize(e: Entity): number {
 interface SketchLabel {
   at: LonLat;
   text: string;
+  /** The next-step hint beside the cursor (smaller, under the readout). */
+  hint?: boolean;
 }
 
 const mid = (a: LonLat, b: LonLat): LonLat => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+
+/** What finishes the sketch from here, said where the eye already is. */
+function nextStep(s: DrawState): string | null {
+  if (s.done || !s.points.length) return null;
+  if (s.shape === 'circle') return 'click the edge · Esc cancels';
+  if (s.shape === 'polygon') return s.points.length >= 3 ? 'click the first corner or double-click to finish' : 'click the next corner · Esc cancels';
+  if (s.shape === 'line') return s.points.length >= 2 ? 'double-click or Enter to finish' : 'click the next point · Esc cancels';
+  return null;
+}
 
 /** The sketch being drawn, on top of everything: outline, rubber band, vertices, measurements. */
 export function sketchLayers(s: DrawState, m: SketchMeasure, ctx: FrameCtx): Layer[] {
@@ -617,6 +697,9 @@ export function sketchLayers(s: DrawState, m: SketchMeasure, ctx: FrameCtx): Lay
     if (m.area_m2 !== undefined && m.area_m2 > 0) labels.push({ at: end, text: `${formatArea(m.area_m2)} · ${formatDistance(m.perimeter_m ?? 0)} perimeter` });
     else if (m.segments.length > 1 || (s.tool !== 'measure' && m.segments.length)) labels.push({ at: end, text: `Σ ${formatDistance(m.length_m)}` });
   }
+
+  const step = nextStep(s);
+  if (step) labels.push({ at: live ?? pts[pts.length - 1]!, text: step, hint: true });
 
   const vertices = s.shape === 'circle' ? [pts[0]!] : pts;
   return [
@@ -664,9 +747,9 @@ export function sketchLayers(s: DrawState, m: SketchMeasure, ctx: FrameCtx): Lay
       data: labels,
       getPosition: (d) => d.at,
       getText: (d) => d.text,
-      getSize: 12,
-      getColor: alpha(r.text, 250),
-      getPixelOffset: [10, -10],
+      getSize: (d) => (d.hint ? 11 : 12),
+      getColor: (d) => (d.hint ? alpha(r.text, 190) : alpha(r.text, 250)),
+      getPixelOffset: (d) => (d.hint ? [10, 10] : [10, -10]),
       fontFamily: 'JetBrains Mono Variable, JetBrains Mono, monospace',
       fontWeight: 600,
       characterSet: 'auto',

@@ -9,21 +9,14 @@ body {
 }
 
 /*
- * Page layouts for Targets and Assistant (layout only: every control is an FDS component).
- * Both are canvas pages in the AppShell (pagePadding="none", pageHeight="fill").
+ * View layouts (layout only: every control is an FDS component). The console fills the AppShell
+ * page (pagePadding="none", pageHeight="fill"); each view fills the space under its tab strip.
  */
-
-.page-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-}
 
 /* ---------- Target board ---------- */
 .tb {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) calc(var(--spacing-64) * 5.5 + var(--spacing-8));
+  grid-template-columns: minmax(0, 1fr) var(--bs-panel-w);
   grid-template-rows: auto auto minmax(0, 1fr);
   height: 100%;
   min-height: 0;
@@ -51,6 +44,8 @@ body {
   min-width: 0;
 }
 .tb-tile {
+  /* The card's full width, so a meter fills it. */
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-6);
@@ -80,45 +75,54 @@ body {
   scroll-snap-type: x proximity;
   scroll-padding-inline: var(--spacing-12);
 }
-/* One 12px gutter: the same as the bar above, on every side of the board. */
+/* One 12px measure: the board's gutter, the gap between columns and the columns' own padding. */
+/* As wide as its columns (never narrower than the board), so the 12px padding on the right is
+   part of the scroll and the last column keeps its gutter when scrolled to the end. */
 .tb__cols {
   display: flex;
-  gap: var(--spacing-8);
+  gap: var(--spacing-12);
+  width: max-content;
+  min-width: 100%;
   height: 100%;
-  padding: var(--spacing-12) 0 var(--spacing-12) var(--spacing-12);
+  padding: var(--spacing-12);
   box-sizing: border-box;
 }
-/* The right gutter as an item (8px gap + 4px), so it survives horizontal scrolling. */
-.tb__cols::after {
-  content: '';
-  flex: 0 0 var(--spacing-4);
-}
 .tb__col {
-  /* 200px: all seven stages fit beside the detail panel at 1920. */
-  flex: 1 0 calc(var(--spacing-64) * 3 + var(--spacing-8));
-  /* Equal columns: one-line text truncates instead of widening its column. */
+  /* 256px columns, so a card's title and its line of facts read in full; the board scrolls
+     sideways when they do not all fit, and spare width on a wide screen is shared out. */
+  flex: 1 0 calc(var(--spacing-64) * 4);
   min-width: 0;
   scroll-snap-align: start;
   display: flex;
   flex-direction: column;
   min-height: 0;
   border: var(--border-width-thin) solid var(--border-neutral-default);
-  border-radius: var(--radius-m);
-  background: var(--background-surface-subtle);
+  border-radius: var(--radius-l);
+  /* The same surface as the side panels; the stage colour lives on the header badge. */
+  background: var(--background-surface-intense);
 }
 .tb__colhead {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-2);
+  /* The same space under a heading as in the record cards (.tb-check). */
+  gap: var(--spacing-6);
   /* Aligned with the card edges below. */
-  padding: var(--spacing-8);
-  border-bottom: var(--border-width-thin) solid var(--border-neutral-default);
+  padding: var(--spacing-12) var(--spacing-12) var(--spacing-4);
 }
+/* The stage on the left, its count at the right edge. */
 .tb__coltitle {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-8);
+}
+/* The gate and hint: up to two lines, always two lines tall, so every column's cards start level. */
+.tb__colgate {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2lh;
 }
 /* The gate a target passes to enter the column, then the hint or priority split. */
 .tb__gate {
@@ -131,10 +135,15 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-8);
-  padding: var(--spacing-8);
+  padding: var(--spacing-8) var(--spacing-12) var(--spacing-12);
 }
+.tb__empty {
+  align-items: center;
+  justify-content: center;
+}
+/* On the cards' own 12px inset, level with the header text. */
 .tb__none {
-  padding: var(--spacing-8) var(--spacing-4);
+  padding-block: var(--spacing-4);
 }
 .tb-card,
 .tb-check {
@@ -144,6 +153,11 @@ body {
   /* The card's full width, so a header's badge sits at the right edge. */
   width: 100%;
   min-width: 0;
+}
+/* Fact groups in a record: each one after the first is a section with a line above it. */
+.tb-check .bs-facts--flush + .bs-facts--flush {
+  padding-top: var(--spacing-12);
+  border-top: var(--border-width-thin) solid var(--border-neutral-default);
 }
 .tb-card__head,
 .tb-check__head {
@@ -181,13 +195,14 @@ body {
   min-height: 0;
   min-width: 0;
   border-left: var(--border-width-thin) solid var(--border-neutral-default);
+  background: var(--background-surface-intense);
 }
 
-/* ---------- Strategic View ---------- */
+/* ---------- Ontology layout ---------- */
 /* Rail | centre | record, in the board's conventions (12px gutters, thin borders). */
 .sv {
   display: grid;
-  grid-template-columns: calc(var(--spacing-64) * 4.5) minmax(0, 1fr) calc(var(--spacing-64) * 5.5 + var(--spacing-8));
+  grid-template-columns: var(--bs-panel-w) minmax(0, 1fr) var(--bs-panel-w);
   grid-template-rows: auto minmax(0, 1fr);
   height: 100%;
   min-height: 0;
@@ -208,12 +223,17 @@ body {
   flex-direction: column;
   min-height: 0;
   border-right: var(--border-width-thin) solid var(--border-neutral-default);
+  background: var(--background-surface-intense);
 }
 .sv__railbody {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-8);
+  gap: var(--spacing-4);
   padding: var(--spacing-12);
+}
+/* The rail's own lines of text sit on the rows' 12px inset. */
+.sv__railbody > span {
+  padding-inline: var(--spacing-12);
 }
 .sv__main {
   grid-column: 2;
@@ -231,60 +251,16 @@ body {
   /* Rows answer to the centre's own width, not the window's. */
   container-type: inline-size;
 }
-/* One row, one height: the three summary cards stretch to the tallest. */
-.sv__row3 {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--spacing-8);
-}
-/* The event: its facts beside the thread of reports. */
-.sv__split {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--spacing-16);
-  align-items: start;
-}
-.sv__col,
-.sv__sections {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.sv__col {
-  gap: var(--spacing-6);
-}
-/* Card sections: even space either side of each divider. */
-.sv__sections {
-  gap: var(--spacing-12);
-}
-/* A list inside a card lines its text up with the card's own content edge (the list and its
-   rows each pad 8px); row highlights stay inside the card. */
-.sv .ds-card .ds-action-list {
-  margin-inline: calc(var(--spacing-16) * -1);
-}
-.sv__btns {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-6);
-}
-.sv__ladder {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  /* Wide enough that neighbouring lists' row highlights never meet. */
-  gap: var(--spacing-24);
-}
-@container (max-width: 899px) {
-  .sv__row3,
-  .sv__split,
-  .sv__ladder {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
 .sv__level {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-6);
+  gap: var(--spacing-4);
   min-width: 0;
+  padding: var(--spacing-8) var(--spacing-12);
+  border-radius: var(--radius-m);
+}
+.sv__level:hover {
+  background: var(--background-surface-subtle);
 }
 .sv__record {
   grid-column: 3;
@@ -294,84 +270,37 @@ body {
   min-height: 0;
   min-width: 0;
   border-left: var(--border-width-thin) solid var(--border-neutral-default);
+  background: var(--background-surface-intense);
 }
-@media (max-width: 1599px) {
-  .sv {
-    grid-template-columns: calc(var(--spacing-64) * 3.5) minmax(0, 1fr) calc(var(--spacing-64) * 5.5 + var(--spacing-8));
-  }
-}
-
-/* ---------- Debrief and Evidence pack ---------- */
-/* Main | 360px side panel, in the Strategic View's conventions. */
-.db {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) calc(var(--spacing-64) * 5.5 + var(--spacing-8));
-  grid-template-rows: auto minmax(0, 1fr);
-  height: 100%;
-  min-height: 0;
-}
-.db > .sv__main {
-  grid-column: 1;
-  grid-row: 2;
-}
-.db > .sv__record {
-  grid-column: 2;
-  grid-row: 2;
-}
-/* Equal tiles: four a row, two when the centre is narrow. */
-.db__tiles {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--spacing-8);
-}
-@container (max-width: 899px) {
-  .db__tiles {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+/* The tab strip takes the page's 12px inset, so it lines up with the rail, the centre and its own cards. */
+.sv__record .bs-tabbar {
+  padding: var(--spacing-12);
 }
 
-/* ---------- Assistant ---------- */
-.as {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) calc(var(--spacing-64) * 6);
+/* ---------- Console: a strip of views over the open view (no nav rail) ---------- */
+.console {
   height: 100%;
-  min-height: 0;
 }
-.as__main {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-}
-.as__bar {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-8);
-  padding: var(--spacing-8) var(--spacing-12);
+/* The strip's inset comes from a wrapper (as .bs-tabbar), on the page's 12px gutter on the top
+   and both sides, as the side panels' tab strips have it; Small tabs start their label at the
+   top of the tab, so the wrapper gives them that room above. */
+.console__tabs {
+  flex: none;
+  padding: var(--spacing-12) var(--spacing-12) 0;
   border-bottom: var(--border-width-thin) solid var(--border-neutral-default);
 }
-.as__conversation,
-.as__home {
+.console__view:not([hidden]) {
+  display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
 }
-.as__composer {
-  flex: none;
-  padding: var(--spacing-8) var(--spacing-12) var(--spacing-12);
-}
-.as__side {
-  display: flex;
-  flex-direction: column;
+.console__view > * {
+  flex: 1 1 auto;
   min-height: 0;
-  border-left: var(--border-width-thin) solid var(--border-neutral-default);
 }
-.as__sidehead {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-2);
-  padding: var(--spacing-8) var(--spacing-12);
-  border-bottom: var(--border-width-thin) solid var(--border-neutral-default);
-}
+
+/* ---------- Assistant (docked panel) ---------- */
 .as__cite {
   display: flex;
   flex-wrap: wrap;
@@ -379,3 +308,93 @@ body {
   gap: var(--spacing-6);
   margin-top: var(--spacing-8);
 }
+
+/* ---------- Ontology Explorer ---------- */
+/* The lineage graph: the five layers as columns of node cards; edges are an SVG overlay drawn
+   from the cards' measured boxes. */
+.on-graph {
+  position: relative;
+}
+/* React Flow draws the graph; its own background is dropped so the card shows through. */
+.on-graph .react-flow {
+  --xy-background-color: transparent;
+  --xy-edge-stroke-default: var(--text-neutral-normal);
+}
+/* A fixed graph still takes clicks on its cards (React Flow sets pointer events off, inline, on nodes that
+   are neither draggable nor selectable). */
+.on-graph .react-flow__node-card {
+  pointer-events: all !important;
+}
+.on-node {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-2);
+  padding: var(--spacing-8);
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.on-node > span {
+  max-width: 100%;
+}
+/* Scrolling moves one composited layer instead of repainting every link. */
+.on-graph .react-flow__viewport {
+  will-change: transform;
+}
+/* The faint layer: every link not drawn on its own, behind the cards. */
+.on-faint {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+  opacity: 0.28;
+  z-index: 0;
+}
+.on-edge {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+/* Legend swatches: each link type has its own colour and pattern. */
+.on-edge--derived-from {
+  stroke: var(--text-brand-normal);
+}
+.on-edge--thread {
+  stroke: var(--text-notice-normal);
+  stroke-dasharray: 6 4;
+}
+.on-edge--protects {
+  stroke: var(--text-positive-normal);
+  stroke-dasharray: 1 5;
+}
+.on-edge--member-of {
+  stroke: var(--text-neutral-normal);
+  stroke-dasharray: 1 5;
+}
+/* The rehearsal inset: both radar reports and the assessment side by side. */
+.on-inset {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--spacing-8);
+}
+@container (max-width: 599px) {
+  .on-inset {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.on-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-12);
+}
+.on-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-4);
+}
+

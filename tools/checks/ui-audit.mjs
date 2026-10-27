@@ -3,13 +3,14 @@
 // text clipped without an ellipsis, HUD overlap, broken images, console errors and FDS dev
 // warnings, failed requests and any request to a non-local origin (air-gap check).
 //   node tools/checks/ui-audit.mjs <width> <height> <dark|light> [--bookmarks]
+// AUDIT_BASE points it at another dev server (default http://localhost:5173/).
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
 const [width, height] = [Number(process.argv[2] ?? 1920), Number(process.argv[3] ?? 1080)];
 const theme = process.argv[4] ?? 'dark';
 const withBookmarks = process.argv.includes('--bookmarks');
-const base = 'http://localhost:5173/';
+const base = process.env.AUDIT_BASE ?? 'http://localhost:5173/';
 const out = `data/shots/audit/${width}x${height}-${theme}`;
 mkdirSync(out, { recursive: true });
 
@@ -110,10 +111,15 @@ const audit = () =>
       const tl = kids('.bs-hud--tl');
       const tr = kids('.bs-hud--tr');
       const bl = kids('.bs-hud--bl');
-      for (const [a, ab] of tl)
-        for (const [b, bb] of [...tr, ...bl])
-          if (ab.left < bb.right && bb.left < ab.right && ab.top < bb.bottom && bb.top < ab.bottom) issues.push(`HUD overlap: ${name(a)} × ${name(b)}`);
-      for (const [e, b] of [...tl, ...tr, ...bl]) if (b.right > mb.right + 1 || b.bottom > mb.bottom + 1 || b.left < mb.left - 1) issues.push(`HUD leaves map: ${name(e)}`);
+      const bc = kids('.bs-hud--bc');
+      const overlaps = (xs, ys) => {
+        for (const [a, ab] of xs)
+          for (const [b, bb] of ys)
+            if (ab.left < bb.right && bb.left < ab.right && ab.top < bb.bottom && bb.top < ab.bottom) issues.push(`HUD overlap: ${name(a)} × ${name(b)}`);
+      };
+      overlaps(tl, [...tr, ...bl]);
+      overlaps(bc, bl);
+      for (const [e, b] of [...tl, ...tr, ...bl, ...bc]) if (b.right > mb.right + 1 || b.bottom > mb.bottom + 1 || b.left < mb.left - 1) issues.push(`HUD leaves map: ${name(e)}`);
       const canvas = map.querySelector('canvas');
       if (!canvas || canvas.width === 0) issues.push('map canvas missing');
     }
@@ -123,8 +129,19 @@ const audit = () =>
     if (consoleEl) {
       const w = (sel) => document.querySelector(sel)?.getBoundingClientRect().width ?? 0;
       const [cw, lw, mw, rw] = [w('.bs-console'), w('.bs-left'), w('.bs-center'), w('.bs-right')];
-      if (lw > 258 || rw > 362) issues.push(`side panel too wide (left ${Math.round(lw)}, right ${Math.round(rw)})`);
+      if (lw > 370 || rw > 370) issues.push(`side panel too wide (left ${Math.round(lw)}, right ${Math.round(rw)})`);
+      if (lw && rw && Math.abs(lw - rw) > 1) issues.push(`side panels differ in width (left ${Math.round(lw)}, right ${Math.round(rw)})`);
       if (Math.abs(cw - lw - rw - mw) > 2) issues.push(`map not filling the console (console ${Math.round(cw)}, map ${Math.round(mw)}, left ${Math.round(lw)}, right ${Math.round(rw)})`);
+    }
+
+    // The timeline never scrolls sideways, and no scrollbar sits inside it.
+    const tl = document.querySelector('.bs-tl');
+    if (tl) {
+      if (tl.scrollWidth > tl.clientWidth + 1) issues.push(`timeline scrolls horizontally (${tl.scrollWidth} > ${tl.clientWidth})`);
+      for (const el of tl.querySelectorAll('*')) {
+        const o = getComputedStyle(el);
+        if ((o.overflowX === 'auto' || o.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 1) issues.push(`timeline: ${name(el)} scrolls sideways`);
+      }
     }
 
     // Broken images (symbol glyphs, logos).
@@ -168,10 +185,32 @@ async function step(label, fn) {
 const raidText = () => page.locator('.bs-tl__lanes').getAttribute('aria-valuenow').catch(() => null);
 const tab = (re) => page.getByRole('tab', { name: re }).first();
 const wait = (ms) => page.waitForTimeout(ms);
+// The console's views are one strip of tabs (no nav rail). Frames whose storyboard app is not
+// the map (A2, B3–B5) open their own view, so map steps return to Battlespace first.
+const openView = (name) => page.locator('.console__tabs').getByRole('tab', { name, exact: true }).click();
+// The map's one toolbar: a Tools menu and a View menu (map view and panels).
+const menuRow = (name) => page.getByRole('menuitem', { name }).or(page.getByRole('option', { name })).first();
+const viewItem = async (name) => {
+  await page.getByRole('button', { name: 'View', exact: true }).click();
+  await wait(400);
+  await menuRow(name).click();
+};
 
 await step('load', async () => {
   await page.goto(`${base}?bm=B4`, { waitUntil: 'networkidle' });
-  await wait(6000);
+  await wait(4000);
+  await openView('Battlespace');
+  await wait(3000);
+  if (!(await page.locator('.bs-left').isVisible())) throw new Error('layers panel should start open');
+  if (!(await page.locator('.bs-right').isVisible())) throw new Error('inspector should start open');
+});
+await step('view-menu', async () => {
+  await page.getByRole('button', { name: 'View', exact: true }).click();
+  await wait(500);
+  for (const row of ['Centre on the defended point', 'North up, flat', 'Full screen', 'Hide layers panel', 'Hide inspector'])
+    if (!(await menuRow(row).isVisible())) throw new Error(`view menu row missing: ${row}`);
+  await page.keyboard.press('Escape');
+  await wait(400);
 });
 await step('left-alerts', async () => {
   await tab(/^Alerts/).click();
@@ -191,9 +230,58 @@ await step('alerts-filter-reset', async () => {
   await page.getByText('All', { exact: true }).click();
   await wait(400);
 });
+// A custom alert is set from the Alerts panel; the audit opens the dialog and cancels, so no
+// alert is armed on the operator log.
+await step('alerts-new', async () => {
+  await page.getByRole('button', { name: 'New custom alert' }).click();
+  await wait(700);
+  const dlg = page.getByRole('dialog', { name: 'New custom alert' });
+  // The conditions are the options of a select field.
+  await dlg.getByRole('combobox', { name: /Fires when/ }).or(dlg.getByLabel('Fires when')).first().click();
+  await wait(400);
+  for (const label of ['Count in a ring', 'Near the VA/VP', 'Magazine low', 'A class appears']) {
+    if (!(await menuRow(label).isVisible())) throw new Error(`alert condition missing: ${label}`);
+  }
+  await menuRow('Magazine low').click();
+  await wait(400);
+});
+await step('alerts-new-cancelled', async () => {
+  await page.getByRole('dialog', { name: 'New custom alert' }).getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('dialog', { name: 'New custom alert' }).waitFor({ state: 'hidden', timeout: 3000 });
+});
 await step('left-sources', async () => {
   await tab(/^Sources/).click();
   await wait(800);
+});
+// A source is registered from the Sources panel; the audit opens the dialog, switches to a feed
+// and cancels, so nothing is recorded on the operator log.
+await step('sources-new', async () => {
+  await page.getByRole('button', { name: 'New source' }).click();
+  await wait(700);
+  const dlg = page.getByRole('dialog', { name: 'New source' });
+  if (!(await dlg.getByLabel(/Range/).first().isVisible())) throw new Error('sensor range field missing');
+  await dlg.getByRole('combobox', { name: /Kind/ }).or(dlg.getByLabel('Kind')).first().click();
+  await wait(400);
+  await menuRow('Feed').click();
+  await wait(400);
+  if (!(await dlg.getByRole('combobox', { name: /Carries/ }).or(dlg.getByLabel('Carries')).first().isVisible())) throw new Error('feed carries field missing');
+});
+await step('sources-new-cancelled', async () => {
+  await page.getByRole('dialog', { name: 'New source' }).getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('dialog', { name: 'New source' }).waitFor({ state: 'hidden', timeout: 3000 });
+});
+// A layer is made from the Layers panel; the audit opens the dialog and cancels, so nothing is
+// recorded on the operator log.
+await step('layers-new', async () => {
+  await tab(/^Layers/).click();
+  await page.getByRole('button', { name: 'New layer' }).click();
+  await wait(700);
+  const dlg = page.getByRole('dialog', { name: 'New layer' });
+  if (!(await dlg.getByLabel(/Name/).first().isVisible())) throw new Error('layer name field missing');
+});
+await step('layers-new-cancelled', async () => {
+  await page.getByRole('dialog', { name: 'New layer' }).getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('dialog', { name: 'New layer' }).waitFor({ state: 'hidden', timeout: 3000 });
 });
 await step('left-layers-filter', async () => {
   await tab(/^Layers/).click();
@@ -242,26 +330,26 @@ await step('entity-overview-scrolled', async () => {
   await page.locator('.bs-right .bs-scroll__viewport, .bs-right .ds-scroll__viewport').first().evaluate((el) => el.scrollTo(0, el.scrollHeight));
   await wait(500);
 });
+// Frames live in the timeline: a menu in the transport, and the [ and ] keys.
 await step('frames-menu', async () => {
   await page.getByRole('button', { name: 'Storyboard frames' }).click();
   await wait(600);
 });
 await step('next-frame', async () => {
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Next frame' }).click();
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press(']');
   await wait(2500);
 });
 await step('tooltip', async () => {
-  await page.getByRole('button', { name: 'Centre on the defended point' }).hover();
+  await openView('Battlespace');
+  await wait(2500);
+  await page.getByRole('button', { name: 'Pause', exact: true }).or(page.getByRole('button', { name: 'Play', exact: true })).first().hover();
   await wait(900);
-});
-await step('role-menu', async () => {
-  await page.mouse.move(width / 2, height / 2);
-  await page.getByRole('button', { name: /View profile/ }).click();
-  await wait(600);
 });
 await step('profile-menu', async () => {
   await page.keyboard.press('Escape');
+  await page.mouse.move(width / 2, height / 2);
   await page.getByRole('button', { name: /account/i }).click();
   await wait(600);
 });
@@ -300,109 +388,90 @@ await step('slider-start', async () => {
 });
 await step('replay-30', async () => {
   await page.goto(`${base}?bm=B5`, { waitUntil: 'networkidle' });
-  await wait(5000);
-  await page.getByRole('button', { name: 'Replay last 30 min' }).click();
+  await wait(4000);
+  await openView('Battlespace');
+  await wait(2500);
+  // Replay sits in the playback-rate menu.
+  await page.getByRole('button', { name: /^Playback rate/ }).click();
+  await wait(400);
+  await menuRow(/Replay last 30 min/).click();
   await wait(2500);
   await page.getByRole('button', { name: 'Pause', exact: true }).click().catch(() => {});
 });
 await step('live', async () => {
-  await page.getByRole('button', { name: 'Live' }).click();
+  // The Live button sits in the timeline's control strip; any menu still open closes first.
+  await page.getByRole('menu').first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => page.keyboard.press('Escape'));
+  await page.getByRole('button', { name: 'Live', exact: true }).click();
   await wait(2500);
 });
-await step('left-closed', async () => {
-  await page.getByRole('button', { name: 'Hide layers panel' }).click();
-  await wait(1200);
+// Both side panels are open (their default); the earlier steps may have moved the layers panel.
+await step('left-open', async () => {
+  if (!(await page.locator('.bs-left').isVisible())) await viewItem('Show layers panel');
+  await wait(300);
 });
 await step('right-closed', async () => {
-  await page.getByRole('button', { name: 'Show layers panel' }).click();
-  await page.getByRole('button', { name: 'Hide inspector' }).click();
+  await viewItem('Hide inspector');
   await wait(1200);
 });
 await step('both-closed', async () => {
-  await page.getByRole('button', { name: 'Hide layers panel' }).click();
+  await viewItem('Hide layers panel');
   await wait(1200);
 });
 await step('panels-restored', async () => {
-  await page.getByRole('button', { name: 'Show layers panel' }).click();
-  await page.getByRole('button', { name: 'Show inspector' }).click();
+  await viewItem('Show layers panel');
+  await wait(300);
+  await viewItem('Show inspector');
   await wait(1200);
 });
 const mapCentre = async () => {
   const b = await page.locator('.bs-map').boundingBox();
   return [b.x + b.width / 2, b.y + b.height / 2];
 };
+await step('tool-menu', async () => {
+  // One Tools menu lists the shapes each tool draws, a section per tool.
+  await page.getByRole('button', { name: 'Tools', exact: true }).click();
+  await wait(500);
+  if (!(await menuRow(/Path/).isVisible())) throw new Error('tools menu did not open');
+});
 await step('tool-measure', async () => {
   const [cx, cy] = await mapCentre();
-  await page.keyboard.press('m');
-  await page.mouse.click(cx - 120, cy + 40);
-  await page.mouse.click(cx + 60, cy - 60);
-  await page.mouse.move(cx + 140, cy);
+  await menuRow(/Path/).click();
+  await wait(300);
+  // Below the centre line, clear of the toolbar.
+  await page.mouse.click(cx - 140, cy + 30);
+  await page.mouse.click(cx - 30, cy + 80);
+  await page.mouse.move(cx + 40, cy + 50);
   await wait(500);
+});
+await step('measure-result', async () => {
+  // Finishing a measurement opens its result in a popover at the shape.
+  await page.keyboard.press('Enter');
+  await wait(700);
+  if (!(await page.getByRole('dialog', { name: /Measure/ }).isVisible())) throw new Error('measurement popover did not open');
 });
 await step('tool-geofence-dialog', async () => {
   const [cx, cy] = await mapCentre();
   await page.keyboard.press('Escape');
+  await wait(300);
   await page.keyboard.press('g');
-  for (const [dx, dy] of [[-100, -80], [100, -80], [100, 80], [-100, 80]]) await page.mouse.click(cx + dx, cy + dy);
+  for (const [dx, dy] of [[-100, -20], [100, -20], [100, 100], [-100, 100]]) await page.mouse.click(cx + dx, cy + dy);
   await page.keyboard.press('Enter');
   await wait(800);
   if (!(await page.getByRole('dialog').isVisible())) throw new Error('promote dialog did not open');
 });
 await step('tool-cancelled', async () => {
-  await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+  // Dismissing the promote dialog discards the sketch.
   await page.keyboard.press('Escape');
-  await wait(500);
-});
-await step('rail-pinned', async () => {
-  await page.keyboard.press('Control+b');
-  await wait(1200);
-});
-await step('nav-strategic', async () => {
-  await page.keyboard.press('Control+b');
-  await wait(600);
-  await page.getByRole('link', { name: /Strategic/ }).or(page.getByRole('button', { name: /^Strategic/ })).first().click();
-  await wait(1500);
-  if (!(await page.locator('.sv').count())) throw new Error('strategic view missing');
-});
-await step('strategic-view-as-l1', async () => {
-  await page.getByRole('button', { name: /L1 · National level/ }).click();
-  await wait(3500);
-  // DP-2 shows to L1 only, and its options can never be selected.
-  const radios = await page.locator('[aria-label="DP-2 option"] input[type="radio"]').evaluateAll((els) => els.map((e) => e.checked || !e.disabled));
-  if (radios.some(Boolean)) throw new Error('DP-2 option selectable or selected');
-});
-await step('strategic-coverage', async () => {
-  await page.locator('.sv__record').getByRole('tab', { name: /^Coverage/ }).click();
-  await wait(600);
-});
-await step('strategic-view-as-l3', async () => {
-  await page.getByRole('button', { name: /L3 · AD Direction Centre/ }).click();
-  await wait(3500);
-});
-await step('nav-debrief', async () => {
-  await page.getByRole('link', { name: /Debrief/ }).or(page.getByRole('button', { name: /^Debrief/ })).first().click();
-  await wait(2500);
-  if (!(await page.locator('.db').count())) throw new Error('debrief missing');
-});
-await step('debrief-after', async () => {
-  await page.locator('.sv__record').getByRole('tab', { name: /^After the raid/ }).click();
-  await wait(600);
-});
-await step('nav-evidence', async () => {
-  await page.getByRole('link', { name: /Evidence/ }).or(page.getByRole('button', { name: /^Evidence/ })).first().click();
-  await wait(3000);
-  // DP-11's options are shown to L1 only and are never selectable.
-  const radios = await page.locator('input[type="radio"]').evaluateAll((els) => els.map((e) => e.checked || !e.disabled));
-  if (radios.some(Boolean)) throw new Error('a response option is selectable or selected');
-});
-await step('evidence-integrity', async () => {
-  await page.locator('.sv__record').getByRole('tab', { name: /^Integrity/ }).click();
-  await wait(600);
+  // The dialog animates out; under audit load that can take longer than a fixed pause.
+  await page
+    .getByRole('dialog', { name: 'Promote to command object' })
+    .waitFor({ state: 'hidden', timeout: 3000 })
+    .catch(() => {
+      throw new Error('promote dialog did not close');
+    });
 });
 await step('nav-targets', async () => {
-  await page.keyboard.press('Control+b');
-  await wait(600);
-  await page.getByRole('link', { name: /Targets/ }).or(page.getByRole('button', { name: /Targets/ })).first().click();
+  await openView('Targets');
   await wait(1000);
 });
 await step('nav-targets-selected', async () => {
@@ -421,23 +490,66 @@ await step('targets-console', async () => {
   await page.locator('.tb__detail').getByRole('tab', { name: /^Record/ }).click();
   await wait(600);
 });
-await step('nav-assistant', async () => {
-  await page.getByRole('link', { name: /Assistant/ }).or(page.getByRole('button', { name: /^Assistant/ })).first().click();
+// The assistant docks beside whichever view is open (the shell's Bruce button).
+const assistant = () => page.getByRole('complementary', { name: 'Assistant' });
+await step('assistant-open', async () => {
+  await page.getByRole('button', { name: /Bruce/ }).click();
   await wait(1000);
+  if (!(await assistant().isVisible())) throw new Error('assistant panel did not open');
 });
 await step('assistant-answer', async () => {
   // Suggestions follow the situation, so type a fixed question instead.
-  await page.getByRole('textbox').last().fill('SITREP for the last 15 minutes');
+  await page.getByRole('textbox', { name: /Ask the assistant/ }).fill('SITREP for the last 15 minutes');
   await page.keyboard.press('Enter');
   await wait(1500);
 });
 await step('nav-back-battlespace', async () => {
-  await page.getByRole('link', { name: /Battlespace/ }).or(page.getByRole('button', { name: /Battlespace/ })).first().click();
+  await openView('Battlespace');
   await wait(4000);
+  if (!(await assistant().isVisible())) throw new Error('assistant panel closed on switching view');
+});
+await step('assistant-closed', async () => {
+  await assistant().getByRole('button', { name: 'Close chat' }).click();
+  // The panel animates out; wait for it rather than a fixed pause.
+  await assistant()
+    .waitFor({ state: 'hidden', timeout: 5000 })
+    .catch(() => {
+      throw new Error('assistant panel did not close');
+    });
+});
+
+// Ontology Explorer at frame A2 (the same D-3 snapshot as A1, its source record in focus).
+await step('nav-ontology', async () => {
+  await page.goto(`${base}?bm=A2`, { waitUntil: 'networkidle' });
+  await wait(5000);
+  if (!(await page.locator('.on').count())) throw new Error('ontology view missing');
+  if ((await page.locator('.on-graph [data-node]').count()) < 6) throw new Error('lineage graph has too few nodes');
+  if ((await page.locator('.on-graph .react-flow__edge-path').count()) < 4) throw new Error('lineage graph draws too few links');
+  if ((await page.locator('[aria-label="Rehearsal inset"]').getByText(/Radar report/i).count()) < 2) throw new Error('rehearsal inset lacks both radar reports');
+});
+await step('ontology-inspector', async () => {
+  await page.locator('.on-graph [data-node="grp:fire-units"]').click();
+  await wait(800);
+  if ((await page.locator('.on section[aria-label="Inspector"]').getByText(/floor/).count()) < 1) throw new Error('fire units do not list their magazines');
+});
+await step('ontology-history', async () => {
+  await page.locator('.on-graph [data-node="X-LCH-N"]').click();
+  await page.locator('.on .sv__record').getByRole('tab', { name: 'History' }).click();
+  await wait(1500);
+  if (!(await page.locator('.on section[aria-label="History"]').getByText(/RECORD/).isVisible())) throw new Error('history did not load');
+});
+await step('ontology-view-as', async () => {
+  await page.getByRole('button', { name: 'View as identity' }).click();
+  await wait(500);
+  await page.getByRole('menuitem', { name: /RIL control room/ }).or(page.getByRole('option', { name: /RIL control room/ })).first().click();
+  await wait(1000);
+  if (!(await page.locator('.on-graph').getByText('NOT PERMITTED').count())) throw new Error('no node coloured as not permitted');
+  // The documents say permission; none uses the word releasability.
+  if ((await page.locator('.on').innerText()).toLowerCase().includes('releasab')) throw new Error('page uses a word the documents do not');
 });
 
 if (withBookmarks) {
-  for (const bm of ['P1', 'A1', 'A3', 'A4', 'A5', 'B1', 'B3', 'B4', 'B5', 'B6', 'C1', 'C1D', 'C2']) {
+  for (const bm of ['P1', 'A1', 'A2', 'A3', 'A5', 'B1', 'B3', 'B4', 'B5', 'C1']) {
     await step(`bm-${bm}`, async () => {
       await page.goto(`${base}?bm=${bm}`, { waitUntil: 'networkidle' });
       await wait(4500);

@@ -7,14 +7,15 @@ import { Map as MlMap, ScaleControl, addProtocol, type StyleSpecification, type 
 import { MapLibreOverlay } from '@deck.gl/maplibre';
 import type { PickingInfo } from '@deck.gl/core';
 import { Protocol } from 'pmtiles';
-import type { Entity } from '@me/schema';
+import type { Entity, LonLat } from '@me/schema';
 import { CLASSES, sidcWithIdentity } from '@me/schema';
+import { distance } from '@me/geo';
 import type { MapClient, ViewStore, Bookmark } from '@me/client';
 import { SymbolAtlas } from '@me/symbology';
 import { buildStyle, firstSymbolLayerId, type BasemapOptions } from './style.ts';
 import { onThemeChange, readTheme, type MapTheme } from './theme.ts';
 import { categorize, isThreat, type LayerKey } from './categorize.ts';
-import { areaFor, areaLayers, engagementLayers, plotLayer, sketchLayers, symbolSize, trackLayers, type AreaItem, type FrameCtx, type PlotItem, type TrackItem } from './layers.ts';
+import { GROUP_ZOOM, areaFor, areaLayers, engagementLayers, groupMarkerLayers, plotLayer, sketchLayers, symbolSize, trackLayers, type AreaItem, type FrameCtx, type GroupMarker, type PlotItem, type TrackItem } from './layers.ts';
 import { DrawController } from './draw.ts';
 
 export interface MapEngineOptions {
@@ -90,6 +91,18 @@ export function createMapEngine(o: MapEngineOptions): MapEngine {
     fadeDuration: 0,
   });
   map.addControl(new ScaleControl({ maxWidth: 120, unit: 'metric' }), 'bottom-right');
+  // The attribution stays one click away behind its ⓘ (ADR 0003) but starts collapsed. MapLibre
+  // expands it once, when it first turns compact; collapsing it as soon as that happens sticks.
+  const attrib = (o.container as HTMLElement).querySelector('.maplibregl-ctrl-attrib');
+  if (attrib) {
+    const watch = new MutationObserver(() => {
+      if (!attrib.classList.contains('maplibregl-compact-show')) return;
+      attrib.classList.remove('maplibregl-compact-show');
+      attrib.removeAttribute('open');
+      watch.disconnect();
+    });
+    watch.observe(attrib, { attributes: true, attributeFilter: ['class'] });
+  }
   // Diagnostics hook for tests and devtools: document.querySelector('.me-map').__meMap
   (o.container as HTMLElement & { __meMap?: MlMap }).__meMap = map;
 
@@ -105,6 +118,8 @@ export function createMapEngine(o: MapEngineOptions): MapEngine {
   let fps = 0;
   let fpsT = performance.now();
   let lastTrackCount = 0;
+  /** R3's outer circle: context traffic inside it draws at full strength. */
+  let r3: { center: LonLat; radius_m: number } | null = null;
 
   const tools = new DrawController(map);
   const overlay = new MapLibreOverlay({
@@ -146,11 +161,17 @@ export function createMapEngine(o: MapEngineOptions): MapEngine {
 
   function refreshTemplates(): void {
     const sidcs = new Set<string>();
+    r3 = null;
     for (const e of client.entities.values()) {
       const key = categorize(e);
+      if (e.geo_details?.ring === 'R3' && e.geo_shape?.type === 'circle') r3 = { center: e.geo_shape.center, radius_m: e.geo_shape.radius_m };
       if (key.startsWith('command') || key === 'reference.vp' || key === 'observation.fragments' || key === 'fused.groups') {
         const cached = areas.get(e.entity_id);
-        if (!cached || cached.version !== e.version) areas.set(e.entity_id, { version: e.version, item: areaFor(e, key, theme) });
+        if (!cached || cached.version !== e.version) {
+          const item = areaFor(e, key, theme);
+          if (item && e.geo_details?.layer) item.layer = e.geo_details.layer;
+          areas.set(e.entity_id, { version: e.version, item });
+        }
       }
       if (!e.mil_view || !e.location) continue;
       if (key === 'observation.plots' || key === 'fused.groups') continue;
@@ -222,6 +243,17 @@ export function createMapEngine(o: MapEngineOptions): MapEngine {
     const plots: PlotItem[] = [];
     const positions = new Map<string, [number, number]>();
     const tmp: [number, number, number] = [0, 0, 0];
+    // At theatre zoom a live raid group draws as one marker with its count and its member
+    // tracks hide, pending ones included; a selected or hovered member still shows.
+    const groups: Entity[] = [];
+    const folded = new Set<string>();
+    if (zoom < GROUP_ZOOM && vs.layers['fused.groups'] !== false) {
+      for (const e of client.entities.values()) {
+        if (e.ontology?.template !== 'group' || !e.is_live || !e.group?.members.length) continue;
+        groups.push(e);
+        for (const m of e.group.members) if (m !== vs.selected && m !== vs.hovered) folded.add(m);
+      }
+    }
     for (const e of client.entities.values()) {
       if (!e.location) continue;
       const tpl = templates.get(e.entity_id);
@@ -234,9 +266,16 @@ export function createMapEngine(o: MapEngineOptions): MapEngine {
         continue;
       }
       if (!tpl || vs.layers[key] === false) continue;
+      if (folded.has(e.entity_id)) continue;
       const k = client.kin.get(e.entity_id);
+      // Context traffic outside R3 draws quietly unless it is selected or hovered.
+      const dim =
+        (key === 'fused.civil' || key === 'fused.maritime') &&
+        e.entity_id !== vs.selected &&
+        e.entity_id !== vs.hovered &&
+        !(r3 && distance(r3.center, [p[0], p[1]]) <= r3.radius_m);
       // Declutter: threats shrink at theatre zoom (groups carry the count).
-      const size = tpl.hostile && zoom < 7.6 ? Math.round(tpl.size * 0.7) : tpl.size;
+      const size = Math.round(tpl.size * (tpl.hostile && zoom < 7.6 ? 0.7 : dim ? 0.8 : 1));
       tracks.push({
         id: e.entity_id,
         key,
@@ -248,9 +287,18 @@ export function createMapEngine(o: MapEngineOptions): MapEngine {
         label: tpl.label,
         hostile: tpl.hostile,
         size,
+        dim,
       });
     }
     lastTrackCount = tracks.length;
+    const markers: GroupMarker[] = [];
+    for (const g of groups) {
+      const at = g.group!.members.map((m) => positions.get(m)).filter((q): q is [number, number] => !!q);
+      if (!at.length) continue;
+      const lon = at.reduce((s, q) => s + q[0], 0) / at.length;
+      const lat = at.reduce((s, q) => s + q[1], 0) / at.length;
+      markers.push({ id: g.entity_id, pos: [lon, lat], count: g.group!.members.length });
+    }
     const areaItems: AreaItem[] = [];
     for (const a of areas.values()) if (a.item) areaItems.push(a.item);
     // Fragments also show their symbol at the fragment location (tracks list handles it).
@@ -259,6 +307,7 @@ export function createMapEngine(o: MapEngineOptions): MapEngine {
       ...(vs.layers['observation.plots'] ? [plotLayer(plots, ctx)] : []),
       ...(vs.layers['event.engagements'] !== false ? engagementLayers(client.events, ctx, positions) : []),
       ...trackLayers(tracks, ctx),
+      ...(markers.length ? groupMarkerLayers(markers, ctx) : []),
       ...sketchLayers(tools.get(), tools.measure(), ctx),
     ];
     overlay.setProps({ layers });

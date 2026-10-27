@@ -1,19 +1,27 @@
 /**
- * Timeline: transport (FDS Buttons, rate DropdownMenu) and the event lanes on a segmented time
- * axis that compresses the days and expands the raid window. Lanes: intel fragments,
- * decisions, rule firings, engagement density; storyboard frames tick above them. Only events
- * received by the picture time are drawn (bitemporal); frames span the whole journal.
+ * Timeline. One control strip (transport, frames, Live, a quiet legend that also filters, the
+ * picture time read out) over one ruler and one row of events.
+ *   - Ruler, tier A: the day names at each day's left edge, the raid window as a tinted band with
+ *     its edges named, and the storyboard frames as ticks on its lower edge (the current and the
+ *     hovered one named).
+ *   - Ruler, tier B: tick labels at the step each axis segment can carry (see timeline.ts).
+ *   - Event row: intel, decisions and rule firings on one baseline, merged where they would touch
+ *     (a mixed marker takes the shape of its most important kind, with a count), over a thin
+ *     density of kills. Only events received by the picture time are drawn (bitemporal).
+ *   - Playhead: a line with a handle; dragging snaps to a frame tick (Shift turns that off). Its
+ *     time is the readout in the strip.
  *
- * The lanes are the one custom visual besides map symbols: FDS has no timeline-lane
- * component. They use FDS tokens and type classes only.
+ * The lanes are the one custom visual besides map symbols: FDS has no timeline component. They
+ * use FDS tokens and type classes only; hovers are FDS Cards.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionList, ActionListItem, Button, Divider, DropdownMenu, DropdownMenuOverlay, DropdownMenuTrigger, Indicator, Tooltip } from '@faclon-labs/fds';
-import { ChevronDown, Pause, Play, Radio, SkipBack, StepBack, StepForward } from 'lucide-react';
-import { DAY, HOUR, MINUTE, formatZulu, type DecisionPayload, type EngagementPayload, type JournalRecord, type RaidClock } from '@me/schema';
+import { ActionList, ActionListItem, ActionListItemIcon, ActionListSection, Badge, Button, Card, DropdownMenu, DropdownMenuOverlay, DropdownMenuTrigger, Tooltip } from '@faclon-labs/fds';
+import { Bookmark as BookmarkIcon, ChevronDown, History, Pause, Play, Radio } from 'lucide-react';
+import { DAY, HOUR, MINUTE, type DecisionPayload, type EngagementPayload, type JournalRecord, type RaidClock } from '@me/schema';
 import type { Bookmark } from '@me/client';
 import { useClient, useClientTick, useEngineTime, useEvents } from '@me/map-react';
 import { eventSummary, raidLabel } from './format.ts';
+import { KIND_PRIORITY, adaptiveTicks, bucketEvents, nearestBucket, snapToFrame, type Bucket, type EventKind } from './timeline.ts';
 
 interface Segment {
   t0: number;
@@ -63,32 +71,32 @@ interface Tick {
   major: boolean;
 }
 
-/** Day marks, hours before H, quarter-hours in the raid window, hours after. */
-function ticksFor(segs: Segment[], clock: RaidClock): Tick[] {
-  const out: Tick[] = [];
-  const h = clock.h;
-  for (let d = -3; d <= 1; d++) out.push({ t: clock.d0 + d * DAY, label: d === 0 ? 'D' : `D${d > 0 ? '+' : ''}${d}`, major: true });
-  for (const m of [-6, -4, -2]) out.push({ t: h + m * HOUR, label: `H${m}h`, major: false });
-  for (let m = -90; m <= 60; m += 15) out.push({ t: h + m * MINUTE, label: m === 0 ? 'H' : `H${m > 0 ? '+' : ''}${m}`, major: m === 0 || m === -60 || m === -30 });
-  for (const hh of [2, 4, 8, 16]) out.push({ t: h + hh * HOUR, label: `H+${hh}h`, major: false });
-  const lo = segs[0]?.t0 ?? 0;
-  const hi = segs[segs.length - 1]?.t1 ?? 0;
-  return out.filter((k) => k.t >= lo && k.t <= hi);
-}
-
 /** Labels that fit: major ticks first, then the rest where they do not touch a placed one. */
 function placeTicks(ticks: Tick[], x: (t: number) => number): Tick[] {
   const CHAR = 6;
   const placed: Array<[number, number]> = [];
   const out: Tick[] = [];
   for (const k of [...ticks].sort((a, b) => Number(b.major) - Number(a.major))) {
-    const a = x(k.t) + 2;
+    const a = x(k.t) - (k.label.length * CHAR) / 2;
     const b = a + k.label.length * CHAR;
-    if (placed.some(([p, q]) => a < q + 4 && b > p - 4)) continue;
+    if (placed.some(([p, q]) => a < q + 6 && b > p - 6)) continue;
     placed.push([a, b]);
     out.push(k);
   }
   return out;
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+/** A tick's label. Day starts are named in tier A, and long steps are just marks: neither carries one here. */
+function tickLabel(t: number, step: number, clock: RaidClock): { label: string; major: boolean } {
+  if ((t - clock.d0) % DAY === 0) return { label: '', major: true };
+  if (t === clock.h) return { label: 'H', major: true };
+  if (step >= 6 * HOUR) return { label: '', major: false };
+  const dt = t - clock.h;
+  const sign = dt < 0 ? '-' : '+';
+  const m = Math.round(Math.abs(dt) / MINUTE);
+  if (step >= HOUR) return { label: m % 60 === 0 ? `H${sign}${m / 60}h` : `H${sign}${Math.floor(m / 60)}h${pad2(m % 60)}`, major: false };
+  return { label: `H${sign}${m}`, major: false };
 }
 
 /** Playback rates, each with what it means in picture time. */
@@ -99,26 +107,90 @@ const RATES: Array<[number, string]> = [
   [300, '5 min per second'],
   [1800, '30 min per second'],
 ];
-/** Room on the left for the lane glyphs. */
-const GUTTER = 16;
-const ROW = { marks: 10, frag: 23, dec: 35, rule: 47, eng: 59, axis: 64 };
-const HEIGHT = 80;
-const LANE_GLYPHS = [
-  ['◆', ROW.frag, 'var(--background-notice-default)', 'Intel fragments'],
-  ['◇', ROW.dec, 'var(--background-brand-default)', 'Decisions'],
-  ['▲', ROW.rule, 'var(--background-negative-default)', 'Rule firings'],
-  ['✕', ROW.eng, 'var(--text-negative-normal)', 'Engagements (kills)'],
-] as const;
 
-export function TimeBar({ bookmarks = [], onBookmark }: { bookmarks?: Bookmark[]; onBookmark?: (b: Bookmark) => void }) {
+/* ---- geometry (SVG units = CSS px) ---- */
+const PAD = 8; // room at both ends of the axis
+const DAYS_H = 14; // the day names, in a row of their own above everything else
+const A0 = DAYS_H; // tier A's top: the raid window, frame ticks, the playhead handle
+const TIER_A = A0 + 18; // tier A's bottom
+const RULER = TIER_A + 20; // tier B (tick labels) sits on the ruler's baseline
+const EVENTS_H = 32; // the event row
+const HEIGHT_OPEN = RULER + EVENTS_H;
+const MERGE_PX = 12;
+const KILL_MAX_H = 8;
+const NARROW = 720; // below this the legend is shapes only
+
+type LegendKind = EventKind | 'eng';
+const LEGEND: Array<{ id: LegendKind; label: string; color: string }> = [
+  { id: 'frag', label: 'Intel', color: 'var(--background-notice-default)' },
+  { id: 'dec', label: 'Decisions', color: 'var(--background-brand-default)' },
+  { id: 'rule', label: 'Rules', color: 'var(--background-negative-default)' },
+  { id: 'eng', label: 'Kills', color: 'var(--text-negative-normal)' },
+];
+const KIND_WORD: Record<EventKind, [string, string]> = { frag: ['intel', 'intel'], dec: ['decision', 'decisions'], rule: ['rule', 'rules'] };
+
+/** A kind's shape, centred on (cx, cy): intel a dot, a decision a diamond, a rule a triangle, kills a small area. */
+function shapePath(kind: LegendKind, cx: number, cy: number, r = 4): string {
+  if (kind === 'dec') return `M ${cx} ${cy - r - 0.5} L ${cx + r + 0.5} ${cy} L ${cx} ${cy + r + 0.5} L ${cx - r - 0.5} ${cy} Z`;
+  if (kind === 'rule') return `M ${cx} ${cy - r - 0.5} L ${cx + r + 0.5} ${cy + r - 0.5} L ${cx - r - 0.5} ${cy + r - 0.5} Z`;
+  if (kind === 'eng') return `M ${cx - r - 1} ${cy + r} L ${cx - 2} ${cy - r + 1} L ${cx + 1} ${cy + 1} L ${cx + r + 1} ${cy - r} L ${cx + r + 1} ${cy + r} Z`;
+  return `M ${cx - r} ${cy} A ${r} ${r} 0 1 0 ${cx + r} ${cy} A ${r} ${r} 0 1 0 ${cx - r} ${cy} Z`;
+}
+function Glyph({ kind, color }: { kind: LegendKind; color: string }) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" aria-hidden style={{ display: 'block' }}>
+      <path d={shapePath(kind, 6, 6, 4)} style={{ fill: color, opacity: kind === 'eng' ? 0.75 : 1 }} />
+    </svg>
+  );
+}
+
+const titleOf = (r: JournalRecord): string => {
+  if (r.kind === 'decision') {
+    const p = r.payload as DecisionPayload;
+    return `${p.dp} · ${p.title}`;
+  }
+  return eventSummary(r).title;
+};
+
+/** What the hover card shows: what it is, its name, and when. */
+interface Hover {
+  x: number;
+  y: number;
+  kind: string;
+  title: string;
+  at?: number;
+}
+
+/** A smooth area over the per-column counts: the engagements' density, at most `tall` high. */
+function densityPath(cols: Array<[number, number]>, base: number, tall: number, max: number): { area: string; line: string } | null {
+  if (!cols.length) return null;
+  const pts = cols.map(([b, n]) => [b * 3 + 1, base - Math.max(2, (n / max) * tall)] as const);
+  let line = `M ${pts[0]![0]} ${pts[0]![1]}`;
+  for (let i = 1; i < pts.length; i++) {
+    const [x0, y0] = pts[i - 1]!;
+    const [x1, y1] = pts[i]!;
+    const mx = (x0 + x1) / 2;
+    line += ` C ${mx} ${y0}, ${mx} ${y1}, ${x1} ${y1}`;
+  }
+  const first = pts[0]![0];
+  const last = pts[pts.length - 1]![0];
+  return { line, area: `M ${first} ${base} L ${first} ${pts[0]![1]} ${line.replace(/^M [^C]*/, '')} L ${last} ${base} Z` };
+}
+
+export function TimeBar({ bookmarks = [], onBookmark, current }: { bookmarks?: Bookmark[]; onBookmark?: (b: Bookmark) => void; current?: string | undefined }) {
   const client = useClient();
   useClientTick(250);
   const t = useEngineTime(100);
   const events = useEvents(500);
   const [rate, setRate] = useState(60);
-  const [hover, setHover] = useState('');
+  // The rate menu is controlled so its action row (replay) can close it too.
+  const [rateOpen, setRateOpen] = useState(false);
+  const [hover, setHover] = useState<Hover | null>(null);
   const [hoverX, setHoverX] = useState<number | null>(null);
+  const [hoverFrame, setHoverFrame] = useState<string | null>(null);
+  const [snap, setSnap] = useState<string | null>(null);
   const [drag, setDrag] = useState<number | null>(null);
+  const [hidden, setHidden] = useState<ReadonlySet<LegendKind>>(new Set());
   const [width, setWidth] = useState(600);
   const ref = useRef<HTMLDivElement | null>(null);
   const lastSeek = useRef(0);
@@ -134,30 +206,58 @@ export function TimeBar({ bookmarks = [], onBookmark }: { bookmarks?: Bookmark[]
   const s = client.scenario;
   const clock = client.clock;
   const segs = useMemo(() => (s ? buildSegments(s.t0, s.t1, s.clock) : []), [s]);
-  const scale = useMemo(() => makeScale(segs, GUTTER, width - 2), [segs, width]);
-  const ticks = useMemo(() => (s ? placeTicks(ticksFor(segs, s.clock), scale.x) : []), [segs, s, scale]);
+  const scale = useMemo(() => makeScale(segs, PAD, width - PAD), [segs, width]);
+  const ticks = useMemo(() => (s ? adaptiveTicks(scale.px, s.clock.h, s.clock.d0).map((k) => ({ ...k, ...tickLabel(k.t, k.step, s.clock) })) : []), [scale, s]);
+  const labelled = useMemo(() => {
+    const breaks = scale.px.slice(1).map((p) => p.x0);
+    return placeTicks(
+      ticks.filter((k) => k.label && !breaks.some((b) => Math.abs(scale.x(k.t) - b) < 14)).map((k) => ({ t: k.t, label: k.label, major: k.major })),
+      scale.x,
+    );
+  }, [ticks, scale]);
 
+  // Everything received by the picture time, counted for the legend; the row draws what is not hidden.
   const lanes = useMemo(() => {
-    const frags: JournalRecord[] = [];
-    const decisions: JournalRecord[] = [];
-    const rules: JournalRecord[] = [];
-    // Kills per 3 px column.
+    const items: Array<{ kind: EventKind; x: number; rec: JournalRecord }> = [];
+    const counts: Record<LegendKind, number> = { frag: 0, dec: 0, rule: 0, eng: 0 };
     const kills = new Map<number, number>();
     for (const r of events) {
-      if (r.kind === 'fragment') frags.push(r);
-      else if (r.kind === 'decision') decisions.push(r);
-      else if (r.kind === 'rule_fire') rules.push(r);
+      let kind: EventKind | null = null;
+      if (r.kind === 'fragment') kind = 'frag';
+      else if (r.kind === 'decision') kind = 'dec';
+      else if (r.kind === 'rule_fire') kind = 'rule';
       else if (r.kind === 'engagement' && (r.payload as EngagementPayload).result === 'kill') {
+        counts.eng += 1;
         const b = Math.floor(scale.x(r.ingest_time) / 3);
         kills.set(b, (kills.get(b) ?? 0) + 1);
       }
+      if (kind) {
+        counts[kind] += 1;
+        items.push({ kind, x: scale.x(r.ingest_time), rec: r });
+      }
     }
-    return { frags, decisions, rules, kills, maxKill: Math.max(1, ...kills.values()) };
+    return { items, counts, kills, killCols: [...kills].sort((a, b) => a[0] - b[0]), maxKill: Math.max(1, ...kills.values()) };
   }, [events, scale]);
+  const buckets = useMemo(() => bucketEvents(lanes.items.filter((i) => !hidden.has(i.kind)), MERGE_PX).sort((a, b) => KIND_PRIORITY[a.top] - KIND_PRIORITY[b.top]), [lanes, hidden]);
+  const density = useMemo(() => (hidden.has('eng') ? null : densityPath(lanes.killCols, HEIGHT_OPEN - 1, KILL_MAX_H, lanes.maxKill)), [lanes, hidden]);
+  const frameXs = useMemo(() => bookmarks.map((b) => ({ id: b.id, x: scale.x(b.t), t: b.t })), [bookmarks, scale]);
 
   if (!s) return null;
-  const playX = scale.x(drag ?? t);
+  const HEIGHT = HEIGHT_OPEN;
+  const shownT = drag !== null ? drag : t;
+  const playX = scale.x(shownT);
+  const compact = width < NARROW;
+  const rel = (e: { clientX: number; clientY: number }) => {
+    const b = ref.current!.getBoundingClientRect();
+    return { x: e.clientX - b.left, y: e.clientY - b.top };
+  };
   const timeAt = (clientX: number) => scale.t(clientX - ref.current!.getBoundingClientRect().left);
+  /** The time under the pointer, snapped to a frame tick when one is close (Shift: never). */
+  const dragTime = (e: { clientX: number; shiftKey: boolean }) => {
+    const id = snapToFrame(e.clientX - ref.current!.getBoundingClientRect().left, frameXs, 6, e.shiftKey);
+    setSnap(id);
+    return id ? frameXs.find((f) => f.id === id)!.t : timeAt(e.clientX);
+  };
   const seek = (tt: number, final: boolean) => {
     const now = performance.now();
     if (final || now - lastSeek.current > 150) {
@@ -165,70 +265,120 @@ export function TimeBar({ bookmarks = [], onBookmark }: { bookmarks?: Bookmark[]
       client.seek(tt);
     }
   };
+  const idx = current ? bookmarks.findIndex((b) => b.id === current) : -1;
+  const dense = scale.px.find((p) => p.dense);
+  const lo = segs[0]?.t0 ?? 0;
+  const hi = segs[segs.length - 1]?.t1 ?? 0;
+  const days = [-3, -2, -1, 0, 1].map((d) => ({ t: s.clock.d0 + d * DAY, label: d === 0 ? 'D' : `D${d > 0 ? '+' : ''}${d}` })).filter((d) => d.t >= lo && d.t <= hi);
+  const readoutLabel = raidLabel(shownT, s.clock);
+
+  const bucketCard = (e: { clientX: number; clientY: number }, b: Bucket<JournalRecord>) => {
+    const parts = (Object.keys(KIND_PRIORITY) as EventKind[])
+      .sort((x, y) => KIND_PRIORITY[y] - KIND_PRIORITY[x])
+      .filter((k) => b.tally[k])
+      .map((k) => `${b.tally[k]} ${KIND_WORD[k][b.tally[k] === 1 ? 0 : 1]}`);
+    const first = [...b.items].sort((x, y) => KIND_PRIORITY[y.kind] - KIND_PRIORITY[x.kind])[0]!;
+    const more = b.items.length - 1;
+    setHover({ ...rel(e), kind: parts.join(' · '), title: `${titleOf(first.rec)}${more ? ` · +${more} more` : ''}`, at: first.rec.ingest_time });
+  };
 
   return (
     <div className="bs-tl">
-      <div className="bs-tl__transport">
+      <div className="bs-tl__bar">
         <Tooltip content={clock.playing ? 'Pause (Space)' : 'Play (Space)'}>
           <Button iconOnly size="sm" variant="primary" tone="brand" aria-label={clock.playing ? 'Pause' : 'Play'} onClick={() => (clock.playing ? client.pause() : client.play(rate))}>
             {clock.playing ? <Pause size={14} /> : <Play size={14} />}
           </Button>
         </Tooltip>
-        <Indicator color={clock.mode === 'live' ? 'Positive' : 'Information'} size="Small" accessibilityLabel={clock.mode} />
-        <Divider orientation="Vertical" height="var(--spacing-20)" />
-        <Tooltip content="Start of journal">
-          <Button iconOnly size="xs" variant="ghost" tone="neutral" aria-label="Start" onClick={() => client.seek(s.t0)}>
-            <SkipBack size={14} />
-          </Button>
-        </Tooltip>
-        <Tooltip content="Back 1 minute">
-          <Button iconOnly size="xs" variant="ghost" tone="neutral" aria-label="Back one minute" onClick={() => client.seek(t - MINUTE)}>
-            <StepBack size={14} />
-          </Button>
-        </Tooltip>
-        <Tooltip content="Forward 1 minute">
-          <Button iconOnly size="xs" variant="ghost" tone="neutral" aria-label="Forward one minute" onClick={() => client.seek(t + MINUTE)}>
-            <StepForward size={14} />
-          </Button>
-        </Tooltip>
         <DropdownMenu
+          isOpen={rateOpen}
+          onOpenChange={({ isOpen }) => setRateOpen(isOpen)}
           selectionType="single"
           value={[String(clock.playing ? clock.rate : rate)]}
           onChange={({ values }) => {
-            const r = Number(values[0] ?? rate);
+            const r = Number(values[0]);
+            if (!r) return;
             setRate(r);
             if (clock.playing) client.play(r);
           }}
         >
           <DropdownMenuTrigger>
-            <Button size="xs" variant="secondary" tone="neutral" trailingIcon={<ChevronDown size={14} />} aria-label={`Playback rate ${clock.playing ? clock.rate : rate}×`}>
+            <Button size="sm" variant="secondary" tone="neutral" trailingIcon={<ChevronDown size={14} />} aria-label={`Playback rate ${clock.playing ? clock.rate : rate}×`}>
               {`${clock.playing ? clock.rate : rate}×`}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuOverlay placement="top-start">
             <ActionList accessibilityLabel="Playback rate">
-              {RATES.map(([r, hint]) => (
-                <ActionListItem key={r} value={String(r)} title={`${r}×`} description={hint} />
-              ))}
+              <ActionListSection>
+                {RATES.map(([r, hint]) => (
+                  <ActionListItem key={r} value={String(r)} title={`${r}×`} description={hint} />
+                ))}
+              </ActionListSection>
+              <ActionListSection>
+                <ActionListItem
+                  value="replay"
+                  title="Replay last 30 min"
+                  isAction
+                  leading={<ActionListItemIcon icon={History} />}
+                  onClick={() => {
+                    client.seek(t - 30 * MINUTE);
+                    client.play(60);
+                    setRateOpen(false);
+                  }}
+                />
+              </ActionListSection>
             </ActionList>
           </DropdownMenuOverlay>
         </DropdownMenu>
-        <Button
-          size="xs"
-          variant="secondary"
-          tone="neutral"
-          onClick={() => {
-            client.seek(t - 30 * MINUTE);
-            client.play(60);
-          }}
-        >
-          Replay last 30 min
-        </Button>
-        <Tooltip content="Follow the live head">
-          <Button iconOnly size="xs" variant="ghost" tone="neutral" aria-label="Live" onClick={() => client.live()}>
-            <Radio size={14} />
-          </Button>
-        </Tooltip>
+        {bookmarks.length ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <Button size="sm" variant="secondary" tone="neutral" leadingIcon={<BookmarkIcon size={14} />} trailingIcon={<ChevronDown size={14} />} aria-label="Storyboard frames">
+                {current ? (compact ? current : `${current} · ${bookmarks[idx]?.label ?? ''}`) : 'Frames'}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuOverlay placement="top-start">
+              <ActionList accessibilityLabel="Storyboard frames">
+                {bookmarks.map((b) => (
+                  <ActionListItem key={b.id} value={b.id} title={`${b.id} · ${b.label}`} description={raidLabel(b.t, s.clock)} isSelected={b.id === current} onClick={() => onBookmark?.(b)} />
+                ))}
+              </ActionList>
+            </DropdownMenuOverlay>
+          </DropdownMenu>
+        ) : null}
+        {clock.mode === 'live' ? (
+          <Badge size="Small" color="Positive" emphasis="Subtle" label="LIVE" />
+        ) : (
+          <Tooltip content="Follow the live head">
+            <Button size="sm" variant="ghost" tone="neutral" leadingIcon={<Radio size={14} />} aria-label="Live" onClick={() => client.live()}>
+              Live
+            </Button>
+          </Tooltip>
+        )}
+        <span className="bs-tl__legend" role="group" aria-label="Event kinds shown on the timeline">
+          {LEGEND.map((l) => {
+            const on = !hidden.has(l.id);
+            return (
+              <Tooltip key={l.id} content={`${l.label}: ${on ? 'shown' : 'hidden'}`}>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  tone="neutral"
+                  aria-pressed={on}
+                  aria-label={`${l.label} ${lanes.counts[l.id]}`}
+                  leadingIcon={<Glyph kind={l.id} color={l.color} />}
+                  onClick={() => setHidden(new Set(on ? [...hidden, l.id] : [...hidden].filter((k) => k !== l.id)))}
+                >
+                  {compact ? undefined : lanes.counts[l.id]}
+                </Button>
+              </Tooltip>
+            );
+          })}
+        </span>
+        <span className="bs-fill" />
+        <span className="bs-tl__readout" aria-label="Picture time">
+          <span className="BodyMediumSemibold bs-num">{readoutLabel}</span>
+        </span>
       </div>
       <div
         ref={(el) => {
@@ -254,53 +404,70 @@ export function TimeBar({ bookmarks = [], onBookmark }: { bookmarks?: Bookmark[]
         }}
         onPointerDown={(e) => {
           (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
-          const tt = timeAt(e.clientX);
+          const tt = dragTime(e);
           setDrag(tt);
           seek(tt, false);
         }}
         onPointerMove={(e) => {
-          const tt = timeAt(e.clientX);
-          setHoverX(e.clientX - ref.current!.getBoundingClientRect().left);
+          const { x, y } = rel(e);
+          setHoverX(x);
           if (drag !== null) {
+            const tt = dragTime(e);
             setDrag(tt);
             seek(tt, false);
           }
-          if (!(e.target as Element).closest?.('[data-tip]')) setHover(raidLabel(tt, s.clock));
+          if ((e.target as Element).closest?.('[data-tip]')) return;
+          const tt = timeAt(e.clientX);
+          if (y >= RULER) {
+            // On the event row: the marker nearest the pointer, within 7 px.
+            const b = nearestBucket(buckets, x, 7);
+            if (b) return bucketCard(e, b);
+            const k = (lanes.kills.get(Math.floor(x / 3) - 1) ?? 0) + (lanes.kills.get(Math.floor(x / 3)) ?? 0) + (lanes.kills.get(Math.floor(x / 3) + 1) ?? 0);
+            if (k > 0 && !hidden.has('eng')) return setHover({ x, y, kind: 'Kills', title: `${k} here`, at: tt });
+          }
+          setHover({ x, y, kind: 'Time', title: raidLabel(tt, s.clock), at: tt });
         }}
-        onPointerUp={(e) => {
+        onPointerUp={() => {
           if (drag === null) return;
-          seek(timeAt(e.clientX), true);
+          seek(drag, true);
           setDrag(null);
+          setSnap(null);
         }}
         onPointerLeave={() => {
-          setHover('');
+          setHover(null);
           setHoverX(null);
         }}
       >
         <svg width={width} height={HEIGHT} viewBox={`0 0 ${width} ${HEIGHT}`} aria-hidden>
-          {scale.px.map((p, i) => (p.dense ? <rect key={i} x={p.x0} y={0} width={p.x1 - p.x0} height={ROW.axis} style={{ fill: 'var(--background-surface-subtle)' }} /> : null))}
-          {scale.px.slice(1).map((p, i) => (
-            <line key={i} x1={p.x0} x2={p.x0} y1={0} y2={ROW.axis} style={{ stroke: 'var(--border-neutral-default)' }} strokeDasharray="2 3" />
-          ))}
-          <line x1={GUTTER} x2={width} y1={ROW.axis} y2={ROW.axis} style={{ stroke: 'var(--border-neutral-default)' }} />
-          {ticks.map((k) => (
-            <g key={k.label}>
-              <line x1={scale.x(k.t)} x2={scale.x(k.t)} y1={ROW.axis} y2={ROW.axis + 3} style={{ stroke: 'var(--border-neutral-highlighted)' }} />
-              <text x={scale.x(k.t) + 2} y={HEIGHT - 2} className={k.major ? 'BodyXSmallMedium' : 'BodyXSmallRegular'} style={{ fill: k.major ? 'var(--text-neutral-normal)' : 'var(--text-neutral-muted)' }}>
-                {k.label}
-              </text>
+          {/* The raid window: a band on tier A with a faint tint under it. */}
+          {dense ? (
+            <g>
+              <rect x={dense.x0} y={A0} width={dense.x1 - dense.x0} height={TIER_A - A0} rx={3} style={{ fill: 'var(--background-brand-faded)', opacity: 0.9 }} />
+              <rect x={dense.x0} y={RULER} width={dense.x1 - dense.x0} height={EVENTS_H} style={{ fill: 'var(--background-brand-faded)', opacity: 0.35 }} />
             </g>
-          ))}
-          {LANE_GLYPHS.map(([g, y, fill, name]) => (
-            <text key={g} x={2} y={y + 4} className="BodyXSmallRegular" style={{ fill }} data-tip onPointerEnter={() => setHover(name)}>
-              {g}
+          ) : null}
+          {/* The day names, above tier A, so the playhead handle and the frame ticks never cover them. */}
+          {days.map((d) => (
+            <text key={d.label} x={scale.x(d.t) + 4} y={10} className="BodyXSmallMedium" style={{ fill: 'var(--text-neutral-normal)' }}>
+              {d.label}
             </text>
           ))}
-          {bookmarks.map((b, i) => {
-            // Frame labels stagger onto a second row where they crowd.
+          {/* The ruler's baseline, with short tick marks on it. */}
+          <line x1={PAD} x2={width - PAD} y1={RULER} y2={RULER} style={{ stroke: 'var(--border-neutral-highlighted)' }} />
+          {ticks.map((k) => (
+            <line key={k.t} x1={scale.x(k.t)} x2={scale.x(k.t)} y1={RULER - (k.major ? 5 : 3)} y2={RULER} style={{ stroke: 'var(--border-neutral-highlighted)' }} />
+          ))}
+          {/* Tier B: tick labels. */}
+          {labelled.map((k) => (
+            <text key={k.t} x={scale.x(k.t)} y={RULER - 9} textAnchor="middle" className={k.major ? 'BodyXSmallMedium' : 'BodyXSmallRegular'} style={{ fill: k.major ? 'var(--text-neutral-normal)' : 'var(--text-neutral-muted)' }}>
+              {k.label}
+            </text>
+          ))}
+          {/* Storyboard frames: ticks on tier A's lower edge; the current, hovered and snapped one named. */}
+          {bookmarks.map((b) => {
             const x = scale.x(b.t);
-            const prev = i > 0 ? scale.x(bookmarks[i - 1]!.t) : -Infinity;
-            const row = x - prev < 20 && i % 2 === 1 ? 1 : 0;
+            const isCurrent = b.id === current;
+            const lit = isCurrent || b.id === hoverFrame || b.id === snap;
             return (
               <g
                 key={b.id}
@@ -310,73 +477,67 @@ export function TimeBar({ bookmarks = [], onBookmark }: { bookmarks?: Bookmark[]
                   e.stopPropagation();
                   onBookmark?.(b);
                 }}
-                onPointerEnter={() => setHover(`${b.id} · ${b.label}`)}
+                onPointerEnter={(e) => {
+                  setHover({ ...rel(e), kind: `Frame ${b.id}`, title: b.label, at: b.t });
+                  setHoverFrame(b.id);
+                }}
+                onPointerLeave={() => {
+                  setHoverFrame(null);
+                  setHover(null);
+                }}
               >
-                <line x1={x} x2={x} y1={ROW.marks + 2} y2={ROW.axis} style={{ stroke: 'var(--border-neutral-highlighted)' }} />
-                <text x={x + 2} y={ROW.marks - 1 + row * 8} className="BodyXSmallMedium" style={{ fill: 'var(--text-neutral-subtle)' }}>
-                  {b.id}
-                </text>
+                <rect x={x - 5} y={A0} width={10} height={TIER_A - A0 + 2} style={{ fill: 'transparent' }} />
+                <line x1={x} x2={x} y1={A0 + (lit ? 4 : 10)} y2={TIER_A} style={{ stroke: lit ? 'var(--border-focused)' : 'var(--border-neutral-highlighted)' }} strokeWidth={lit ? 2 : 1} />
+                {lit ? (
+                  <text x={x + 5} y={A0 + 13} className="BodyXSmallMedium" style={{ fill: 'var(--text-neutral-normal)', paintOrder: 'stroke', stroke: 'var(--background-surface-intense)', strokeWidth: 3 }}>
+                    {b.id}
+                  </text>
+                ) : null}
               </g>
             );
           })}
-          {lanes.frags.map((r) => (
-            <text key={r.record_id} x={scale.x(r.ingest_time) - 4} y={ROW.frag + 4} className="BodyXSmallRegular" style={{ fill: 'var(--background-notice-default)' }} data-tip onPointerEnter={() => setHover(eventSummary(r).title)}>
-              ◆
-            </text>
-          ))}
-          {lanes.decisions.map((r) => {
-            const p = r.payload as DecisionPayload;
-            return (
-              <text key={r.record_id} x={scale.x(r.ingest_time) - 4} y={ROW.dec + 4} className="BodyXSmallRegular" style={{ fill: p.status === 'option' ? 'var(--text-neutral-muted)' : 'var(--background-brand-default)' }} data-tip onPointerEnter={() => setHover(`${p.dp} · ${p.title}`)}>
-                ◇
-              </text>
-            );
-          })}
-          {lanes.rules.map((r) => (
-            <text key={r.record_id} x={scale.x(r.ingest_time) - 4} y={ROW.rule + 4} className="BodyXSmallRegular" style={{ fill: 'var(--background-negative-default)' }} data-tip onPointerEnter={() => setHover(eventSummary(r).title)}>
-              ▲
-            </text>
-          ))}
-          {[...lanes.kills].map(([b, n]) => {
-            const h = Math.max(2, (n / lanes.maxKill) * 10);
-            return <rect key={b} x={b * 3} y={ROW.eng + 4 - h} width={2} height={h} style={{ fill: 'var(--text-negative-normal)' }} />;
-          })}
-          {hoverX !== null && hover ? <HoverReadout x={hoverX} width={width} text={hover} /> : null}
-          <line x1={playX} x2={playX} y1={0} y2={ROW.axis} style={{ stroke: 'var(--border-focused)' }} strokeWidth={2} />
-          <path d={`M ${playX - 4} 0 L ${playX + 4} 0 L ${playX} 5 Z`} style={{ fill: 'var(--border-focused)' }} />
-          <PlayheadTag x={playX} width={width} text={`${raidLabel(drag !== null ? scale.t(drag) : t, s.clock)} · ${formatZulu(drag !== null ? scale.t(drag) : t).slice(0, 5)}Z`} />
+          <g pointerEvents="none">
+            {/* Kills: a thin density under everything. */}
+            {density ? (
+              <g>
+                <path d={density.area} style={{ fill: 'var(--text-negative-normal)', opacity: 0.25 }} />
+                <path d={density.line} fill="none" style={{ stroke: 'var(--text-negative-normal)' }} strokeWidth={1.25} strokeLinejoin="round" />
+              </g>
+            ) : null}
+            {/* Events: one baseline; a rule over a decision over intel; the hover card says how many a marker holds. */}
+            {buckets.map((b, i) => {
+              const cy = RULER + 15;
+              const color = b.top === 'rule' ? 'var(--background-negative-default)' : b.top === 'dec' ? 'var(--background-brand-default)' : 'var(--background-notice-default)';
+              const near = Math.abs(b.x - playX) <= 6;
+              return (
+                <path key={i} d={shapePath(b.top, b.x, cy, b.items.length > 1 ? 5 : 4)} strokeLinejoin="round" strokeWidth={1.5} style={{ fill: color, stroke: 'var(--background-surface-intense)', opacity: near ? 0.5 : 1 }} />
+              );
+            })}
+          </g>
+          {/* The hover guide. */}
+          {hoverX !== null ? <line x1={hoverX} x2={hoverX} y1={TIER_A} y2={HEIGHT} pointerEvents="none" style={{ stroke: 'var(--border-neutral-highlighted)' }} strokeDasharray="2 3" /> : null}
+          {/* The playhead: a 2 px line with a round handle; its time is the readout above. */}
+          <line x1={playX} x2={playX} y1={A0 + 4} y2={HEIGHT} pointerEvents="none" style={{ stroke: 'var(--border-focused)' }} strokeWidth={2} />
+          <circle cx={playX} cy={A0 + 5} r={5} pointerEvents="none" style={{ fill: 'var(--border-focused)', stroke: 'var(--background-surface-intense)' }} strokeWidth={2} />
         </svg>
+        {hover && hover.kind !== 'Time' ? <HoverCard hover={hover} width={width} clock={s.clock} /> : null}
       </div>
     </div>
   );
 }
 
-/** The picture time, on the playhead's foot over the axis: it moves with the time it names. */
-function PlayheadTag({ x, width, text }: { x: number; width: number; text: string }) {
-  const w = text.length * 6 + 10;
-  const left = Math.max(GUTTER, Math.min(width - w - 1, x - w / 2));
+/** What is under the pointer: a small FDS Card above it (a frame, a marker's events, the kills). */
+function HoverCard({ hover, width, clock }: { hover: Hover; width: number; clock: RaidClock }) {
+  const flip = hover.x > width - 280;
   return (
-    <g pointerEvents="none">
-      {/* Solid brand fill: it must cover the tick labels it sits on. */}
-      <rect x={left} y={ROW.axis + 1} width={w} height={13} rx={2} style={{ fill: 'var(--background-brand-default)' }} />
-      <text x={left + 5} y={ROW.axis + 11} className="BodyXSmallMedium" style={{ fill: 'var(--text-static-white-normal)' }}>
-        {text}
-      </text>
-    </g>
-  );
-}
-
-/** What is under the pointer (a time, a frame, an event), beside it and inside the lanes. */
-function HoverReadout({ x, width, text }: { x: number; width: number; text: string }) {
-  const w = text.length * 6 + 8;
-  const left = x + 8 + w > width ? x - 8 - w : x + 8;
-  return (
-    <g pointerEvents="none">
-      <line x1={x} x2={x} y1={0} y2={ROW.axis} style={{ stroke: 'var(--border-neutral-highlighted)' }} strokeDasharray="2 2" />
-      <rect x={left} y={ROW.rule - 9} width={w} height={14} rx={2} style={{ fill: 'var(--background-surface-intense)', stroke: 'var(--border-neutral-default)' }} />
-      <text x={left + 4} y={ROW.rule + 2} className="BodyXSmallMedium" style={{ fill: 'var(--text-neutral-normal)' }}>
-        {text}
-      </text>
-    </g>
+    <div className="bs-tl__card" style={{ left: hover.x + (flip ? -14 : 14), top: Math.max(4, hover.y - 12), transform: `translate(${flip ? '-100%' : '0'}, -100%)` }}>
+      <Card padding={12} size="Medium" accessibilityLabel={`${hover.kind}: ${hover.title}`}>
+        <div className="bs-tl__cardbody">
+          <span className="BodyXSmallRegular bs-muted">{hover.kind}</span>
+          <span className="BodySmallSemibold">{hover.title}</span>
+          {hover.at !== undefined ? <span className="BodyXSmallRegular bs-muted bs-num">{raidLabel(hover.at, clock)}</span> : null}
+        </div>
+      </Card>
+    </div>
   );
 }

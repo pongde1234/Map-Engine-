@@ -15,7 +15,11 @@ export function Facts({ title, items, flush }: { title?: string; items: Fact[]; 
   if (!rows.length) return null;
   return (
     <section className={flush ? 'bs-facts bs-facts--flush' : 'bs-facts'} aria-label={title}>
-      {title ? <span className="BodyXSmallMedium bs-muted">{title.toUpperCase()}</span> : null}
+      {title ? (
+        <div className="bs-sec__head">
+          <span className="BodyMediumSemibold">{title}</span>
+        </div>
+      ) : null}
       <dl className="bs-facts__grid">
         {rows.map(([k, v, wide], i) => (
           <div key={`${i}:${k}`} className={wide ? 'bs-fact bs-fact--wide' : 'bs-fact'}>

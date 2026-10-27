@@ -51,6 +51,7 @@ export class DrawController {
   constructor(private readonly map: MlMap) {
     map.on('click', this.onClick);
     map.on('mousemove', this.onMove);
+    map.on('mouseout', this.onOut);
     map.on('dblclick', this.onDblClick);
     window.addEventListener('keydown', this.onKey);
   }
@@ -138,6 +139,7 @@ export class DrawController {
   destroy(): void {
     this.map.off('click', this.onClick);
     this.map.off('mousemove', this.onMove);
+    this.map.off('mouseout', this.onOut);
     this.map.off('dblclick', this.onDblClick);
     window.removeEventListener('keydown', this.onKey);
     this.map.doubleClickZoom.enable();
@@ -184,6 +186,18 @@ export class DrawController {
     const p: LonLat = [e.lngLat.lng, e.lngLat.lat];
     const { shape, points } = this.s;
     this.set({ ...this.s, cursor: p, radius_m: shape === 'circle' && points[0] ? distance(points[0], p) : this.s.radius_m });
+  };
+
+  /**
+   * The pointer left the map (onto the draw bar, a panel or off screen): drop the rubber band, so
+   * the sketch shows only the points placed, not an edge to wherever the pointer crossed out.
+   * A circle's radius only follows the pointer until it is clicked, so that preview goes too;
+   * Finish then commits what was placed, never a radius picked up on the way to the button.
+   */
+  private onOut = (): void => {
+    if (!this.capturing() || !this.s.cursor) return;
+    const previewRadius = this.s.shape === 'circle' && this.s.points.length === 1;
+    this.set({ ...this.s, cursor: null, ...(previewRadius ? { radius_m: 0 } : {}) });
   };
 
   /** A double-click lands as two clicks first: drop the duplicate vertex, then finish. */

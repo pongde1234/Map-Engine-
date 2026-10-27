@@ -1,81 +1,174 @@
 /**
- * Annotate tools, from FDS components: the bar on the map that drives the active sketch (the
- * tools start from the map toolbar), and the dialog that promotes a finished sketch to a
- * command object. Promotion journals it on the operator chain with the session's
- * identity at the picture time on screen; a geofence then fires on watched tracks entering
- * or leaving it.
+ * Annotate tools, from FDS components. One toolbar menu lists the shapes each tool draws
+ * (ToolMenu); while drawing, the map itself says what finishes the sketch. A finished
+ * measurement opens a popover at the shape with its result (MeasurePopover); a finished drawing
+ * or geofence opens the dialog that promotes it to a command object (PromoteModal). Promotion
+ * journals it on the operator chain with the session's identity at the picture time on screen;
+ * a geofence then fires on watched tracks entering or leaving it.
  */
 import { useEffect, useState } from 'react';
-import { Badge, Button, Card, Chip, ChipGroup, Modal, ModalBody, ModalFooter, ModalHeader, TextInput, Tooltip, useToast } from '@faclon-labs/fds';
-import { Check, RotateCcw, Undo2, X } from 'lucide-react';
-import type { SketchShape, ToolKind } from '@me/map';
-import type { EntityComponents, GeoType, GeofenceWatch } from '@me/schema';
-import { useClient, useDrawState, useEngineTime, useViewStore } from '@me/map-react';
+import {
+  ActionList,
+  ActionListItem,
+  ActionListItemIcon,
+  ActionListItemText,
+  ActionListSection,
+  Badge,
+  Button,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  Popover,
+  PopoverInteractiveWrapper,
+  TextInput,
+  useToast,
+} from '@faclon-labs/fds';
+import { RotateCcw, X } from 'lucide-react';
+import type { DrawState, ToolKind } from '@me/map';
+import type { EntityComponents, GeoType, GeofenceWatch, LonLat } from '@me/schema';
+import { destination, formatArea, formatBearing, formatDistance, formatMgrs } from '@me/geo';
+import { useClient, useDrawState, useEngine, useEngineTime, useViewStore } from '@me/map-react';
 import { Facts } from './Facts.tsx';
+import { Pick } from './AlertRules.tsx';
+import { operatorLayers } from './OperatorLayers.tsx';
 import { raidLabel } from './format.ts';
-import { HINT, SHAPES, TOOL_WORD, TYPE_WORD, WATCH, sketchReadout, typesFor } from './sketch.ts';
+import { DEFAULT_SHAPE, SHAPES, SHAPE_ICON, TOOL_WORD, TYPE_WORD, WATCH, sketchReadout, typesFor } from './sketch.ts';
+
+const SHORTCUT: Record<ToolKind, string> = { draw: 'D', measure: 'M', geofence: 'G' };
+const TOOLS: ToolKind[] = ['draw', 'measure', 'geofence'];
+
+/** A ToolMenu row's value: the tool and the shape it draws. */
+export const toolValue = (tool: ToolKind, shape: string): string => `${tool}:${shape}`;
 
 /**
- * The active tool, on the map where the eye already is: tool, shape, one hint (or the live
- * measurement once there is something to measure), and the next action. One row; it wraps on
- * a narrow map.
+ * Every annotate tool's shapes in one toolbar menu, a section per tool (inside a
+ * DropdownMenuOverlay whose DropdownMenu owns the selection; rows are valued with toolValue).
+ * The row with the shortcut is the tool's keyboard default; while drawing, the shape in use is
+ * the selected row and a last row stops drawing.
  */
-export function DrawBar({ onPromote }: { onPromote: () => void }) {
-  const { state: s, measure, tools } = useDrawState();
-  if (!s.tool || !tools) return null;
-  const shapes = SHAPES[s.tool];
-  const started = s.points.length > 0;
-  const keep = s.tool === 'measure';
+export function ToolMenu() {
+  const { state: s, tools } = useDrawState();
   return (
-    <Card padding={12} size="Medium" width="fit-content" maxWidth="100%" accessibilityLabel={`${TOOL_WORD[s.tool]} tool`}>
-      <div className="bs-drawbar">
-        <span className="BodyXSmallSemibold">{TOOL_WORD[s.tool].toUpperCase()}</span>
-        {shapes.length > 1 && !s.done ? (
-          <ChipGroup selectionType="single" size="Small" accessibilityLabel="Shape" value={s.shape} onChange={({ values }) => values[0] && tools.setShape(values[0] as SketchShape)}>
-            {shapes.map((x) => (
-              <Chip key={x.id} value={x.id}>
-                {x.label}
-              </Chip>
-            ))}
-          </ChipGroup>
-        ) : null}
-        {started ? <span className="BodySmallSemibold bs-num">{sketchReadout(s, measure)}</span> : <span className="BodySmallRegular bs-muted">{HINT[s.shape]}</span>}
-        <span className="bs-drawbar__actions">
-          {s.done ? (
-            <>
-              <Button size="xs" variant="primary" tone="brand" leadingIcon={<Check size={14} />} onClick={onPromote}>
-                {keep ? 'Keep' : 'Promote'}
-              </Button>
-              <Button size="xs" variant="secondary" tone="neutral" leadingIcon={<RotateCcw size={14} />} onClick={() => tools.restart()}>
-                {keep ? 'Clear' : 'Redraw'}
-              </Button>
-            </>
-          ) : (
-            <>
-              {started ? (
-                <Tooltip content="Remove the last point (Backspace)">
-                  <Button iconOnly size="xs" variant="ghost" tone="neutral" aria-label="Undo last point" onClick={() => tools.undo()}>
-                    <Undo2 size={14} />
-                  </Button>
-                </Tooltip>
-              ) : null}
-              <Button size="xs" variant="primary" tone="brand" leadingIcon={<Check size={14} />} isDisabled={!tools.canFinish()} onClick={() => tools.finish()}>
-                Finish
-              </Button>
-            </>
-          )}
-          <Tooltip content="Cancel (Esc)">
-            <Button size="xs" variant="ghost" tone="neutral" leadingIcon={<X size={14} />} onClick={() => tools.cancel()}>
-              Cancel
-            </Button>
-          </Tooltip>
-        </span>
-      </div>
-    </Card>
+    <ActionList accessibilityLabel="Annotate tools">
+      {TOOLS.map((tool) => (
+        <ActionListSection key={tool} title={TOOL_WORD[tool]}>
+          {SHAPES[tool].map((x) => {
+            const Icon = SHAPE_ICON[tool][x.id];
+            return (
+              <ActionListItem
+                key={x.id}
+                value={toolValue(tool, x.id)}
+                title={x.label}
+                {...(Icon ? { leading: <ActionListItemIcon icon={Icon} /> } : {})}
+                {...(x.id === DEFAULT_SHAPE[tool] ? { trailing: <ActionListItemText>{SHORTCUT[tool]}</ActionListItemText> } : {})}
+              />
+            );
+          })}
+        </ActionListSection>
+      ))}
+      {s.tool ? (
+        <ActionListSection>
+          <ActionListItem value="stop" title="Stop drawing" isAction intent="negative" leading={<ActionListItemIcon icon={X} />} trailing={<ActionListItemText>Esc</ActionListItemText>} onClick={() => tools?.cancel()} />
+        </ActionListSection>
+      ) : null}
+    </ActionList>
   );
 }
 
-/** Promote a finished sketch: name, type (or what a geofence watches), then journal it. */
+/** Where a finished sketch's popover points: the top of the shape, so it opens above it. */
+function anchorOf(s: DrawState): LonLat | null {
+  const pts = s.points;
+  if (!pts.length) return null;
+  if (s.shape === 'circle') return s.radius_m > 0 ? destination(pts[0]!, 0, s.radius_m) : pts[0]!;
+  // The northernmost point, so a popover opening upward never covers the shape it describes.
+  return pts.reduce((top, p) => (p[1] > top[1] ? p : top), pts[0]!);
+}
+
+/**
+ * A finished measurement, in a popover at the shape: the result, then measure again or keep it
+ * on the map. Closing it (✕, Esc, a click elsewhere) ends the measurement.
+ */
+export function MeasurePopover({ hidden, onKeep }: { hidden?: boolean; onKeep: () => void }) {
+  const engine = useEngine();
+  const { state: s, measure, tools } = useDrawState();
+  const open = !!tools && !hidden && s.tool === 'measure' && s.done;
+  const anchor = open ? anchorOf(s) : null;
+  const [xy, setXy] = useState<{ x: number; y: number } | null>(null);
+  const ax = anchor?.[0];
+  const ay = anchor?.[1];
+  useEffect(() => {
+    if (!engine || ax === undefined || ay === undefined) {
+      setXy(null);
+      return;
+    }
+    const place = () => {
+      const p = engine.map.project([ax, ay]);
+      setXy({ x: p.x, y: p.y });
+    };
+    place();
+    engine.map.on('move', place);
+    return () => {
+      engine.map.off('move', place);
+    };
+  }, [engine, ax, ay]);
+  if (!open || !xy || !measure || !tools) return null;
+
+  const shape = SHAPES.measure.find((x) => x.id === s.shape)?.label ?? 'Measurement';
+  const last = measure.segments[measure.segments.length - 1];
+  const pts = s.points;
+  const facts =
+    s.shape === 'circle'
+      ? [
+          ['Radius', formatDistance(s.radius_m)] as [string, string],
+          ['Area', formatArea(measure.area_m2 ?? 0)] as [string, string],
+          ['Centre', formatMgrs(pts[0]!), 'wide'] as [string, string, 'wide'],
+        ]
+      : s.shape === 'polygon'
+        ? [
+            ['Area', formatArea(measure.area_m2 ?? 0)] as [string, string],
+            ['Perimeter', formatDistance(measure.perimeter_m ?? 0)] as [string, string],
+            ['Corners', String(pts.length)] as [string, string],
+          ]
+        : [
+            ['Length', formatDistance(measure.length_m)] as [string, string],
+            ['Legs', String(measure.segments.length)] as [string, string],
+            last ? (['Last bearing', formatBearing(last.bearing_deg)] as [string, string]) : null,
+            ['From', formatMgrs(pts[0]!), 'wide'] as [string, string, 'wide'],
+            ['To', formatMgrs(pts[pts.length - 1]!), 'wide'] as [string, string, 'wide'],
+          ];
+  return (
+    <div className="bs-sketch-anchor" style={{ left: xy.x, top: xy.y }}>
+      <Popover
+        isOpen
+        onOpenChange={({ isOpen }) => {
+          if (!isOpen) tools.cancel();
+        }}
+        title={`Measure · ${shape}`}
+        content={<Facts flush items={facts} />}
+        footer={
+          <>
+            <Button size="md" variant="primary" tone="neutral" leadingIcon={<RotateCcw size={14} />} onClick={() => tools.restart()}>
+              Measure again
+            </Button>
+            <Button size="md" variant="primary" tone="brand" onClick={onKeep}>
+              Keep on map
+            </Button>
+          </>
+        }
+      >
+        <PopoverInteractiveWrapper className="bs-sketch-anchor__target" aria-label="Measurement result">
+          <span />
+        </PopoverInteractiveWrapper>
+      </Popover>
+    </div>
+  );
+}
+
+/**
+ * Promote a finished sketch: name, type (or what a geofence watches), then journal it.
+ * Redraw starts the same shape again; dismissing the dialog discards the sketch.
+ */
 export function PromoteModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const client = useClient();
   const view = useViewStore();
@@ -86,8 +179,11 @@ export function PromoteModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   const [type, setType] = useState<GeoType>('annotation');
   const [watch, setWatch] = useState<GeofenceWatch>('hostile');
   const [note, setNote] = useState('');
+  // The operator layer it goes in; 'none' keeps it in "Operator objects".
+  const [layer, setLayer] = useState('none');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const opLayers = operatorLayers(client.entities.values());
 
   const tool = s.tool;
   const types = tool ? typesFor(tool, s.shape) : ['annotation' as GeoType];
@@ -97,6 +193,7 @@ export function PromoteModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     setType(types[0]!);
     setWatch('hostile');
     setNote('');
+    setLayer('none');
     setError(null);
     // Reset only when the dialog opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -105,6 +202,14 @@ export function PromoteModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   const shape = tools?.geometry() ?? null;
   const who = client.identity;
   const clock = client.scenario?.clock;
+  const discard = () => {
+    tools?.cancel();
+    onClose();
+  };
+  const redraw = () => {
+    tools?.restart();
+    onClose();
+  };
   const promote = async () => {
     if (!shape || !name.trim()) {
       setError(name.trim() ? 'The sketch has no shape yet.' : 'Give it a name.');
@@ -115,7 +220,14 @@ export function PromoteModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     const payload: EntityComponents = {
       aliases: { name: name.trim() },
       geo_shape: shape,
-      geo_details: { type, label: name.trim().toUpperCase(), status: 'active', ...(type === 'geofence' ? { watch } : {}), ...(note.trim() ? { note: note.trim() } : {}) },
+      geo_details: {
+        type,
+        label: name.trim().toUpperCase(),
+        status: 'active',
+        ...(type === 'geofence' ? { watch } : {}),
+        ...(note.trim() ? { note: note.trim() } : {}),
+        ...(layer !== 'none' && client.entities.has(layer) ? { layer } : {}),
+      },
     };
     try {
       const rec = await client.publish({ payload });
@@ -137,45 +249,28 @@ export function PromoteModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   };
 
   return (
-    <Modal isOpen={isOpen && !!tool} onDismiss={onClose} size="sm" accessibilityLabel="Promote to command object">
+    <Modal isOpen={isOpen && !!tool} onDismiss={discard} size="md" accessibilityLabel="Promote to command object">
       <ModalHeader title="Promote to command object" subtitle={`Recorded as ${who?.display ?? 'you'} at ${raidLabel(t, clock)}`} />
       <ModalBody>
-        <div className="bs-stack">
+        <div className="bs-form">
+          <div className="bs-form__wide">
           <TextInput label="Name" value={name} onChange={({ value }) => setName(value ?? '')} placeholder={type === 'geofence' ? 'Coastal watch box' : 'Name on the map'} isRequired necessityIndicator="required" maxCharacters={40} autoFocus {...(error ? { validationState: 'error' as const, errorText: error } : {})} />
-          {types.length > 1 ? (
-            <ChipGroup label="Type" selectionType="single" size="Small" value={type} onChange={({ values }) => values[0] && setType(values[0] as GeoType)}>
-              {types.map((x) => (
-                <Chip key={x} value={x}>
-                  {TYPE_WORD[x] ?? x}
-                </Chip>
-              ))}
-            </ChipGroup>
-          ) : null}
-          {type === 'geofence' ? (
-            <ChipGroup label="Alert on" selectionType="single" size="Small" value={watch} onChange={({ values }) => values[0] && setWatch(values[0] as GeofenceWatch)}>
-              {WATCH.map((x) => (
-                <Chip key={x.id} value={x.id}>
-                  {x.label}
-                </Chip>
-              ))}
-            </ChipGroup>
-          ) : null}
+          </div>
+          {types.length > 1 ? <Pick label="Type" value={type} options={types.map((x) => ({ id: x, label: TYPE_WORD[x] ?? x }))} onChange={setType} /> : null}
+          {type === 'geofence' ? <Pick label="Alert on" value={watch} options={WATCH} onChange={setWatch} /> : null}
+          {/* Only once the operator has made a layer: otherwise everything is in "Operator objects". */}
+          {opLayers.length ? <Pick label="Layer" value={layer} options={[{ id: 'none', label: 'Operator objects' }, ...opLayers.map((l) => ({ id: l.entity_id, label: l.aliases?.name ?? l.entity_id }))]} onChange={setLayer} /> : null}
+          <div className="bs-form__wide">
           <TextInput label="Note" value={note} onChange={({ value }) => setNote(value ?? '')} placeholder="Optional" maxCharacters={120} />
-          <Facts
-            title="Record"
-            items={[
-              ['Type', TYPE_WORD[type] ?? type],
-              ['Shape', sketchReadout(s, measure)],
-              ['Author', who ? `${who.display} (${who.role.toUpperCase()})` : '—', 'wide'],
-              ['Releasable to', who?.releasability.join(' · ') ?? '—', 'wide'],
-              ['Label', <Badge size="Small" color="Notice" emphasis="Subtle" label="SYNTHETIC//DEMO" />],
-            ]}
-          />
+          </div>
+          <div className="bs-form__wide">
+          <Facts flush items={[['Shape', sketchReadout(s, measure)]]} />
+          </div>
         </div>
       </ModalBody>
       <ModalFooter>
-        <Button size="sm" variant="secondary" tone="neutral" onClick={onClose}>
-          Cancel
+        <Button size="sm" variant="secondary" tone="neutral" leadingIcon={<RotateCcw size={14} />} onClick={redraw}>
+          Redraw
         </Button>
         <Button size="sm" variant="primary" tone="brand" isLoading={busy} onClick={() => void promote()}>
           {type === 'geofence' ? 'Promote and arm' : 'Promote'}

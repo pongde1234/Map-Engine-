@@ -1,39 +1,26 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
-import { AppShell, EmptyState, NAV_ICON_SIZE, Spinner, ThemeProvider, ToastContainer, type NavItem } from '@faclon-labs/fds';
-import { ClipboardCheck, Crosshair, Factory, FileCheck2, Landmark, Map as MapIcon, MessageSquare, Network, PlayCircle } from 'lucide-react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
+import { AppShell, TabItem, TabList, TabPanel, Tabs, ThemeProvider, ToastContainer } from '@faclon-labs/fds';
+import { Crosshair, Map as MapIcon, Network } from 'lucide-react';
 import { MapClient, createViewStore, syncAcrossWindows } from '@me/client';
 import { MapEngineProvider, useClient, useViewStore } from '@me/map-react';
 import { useDerived } from '@me/ui';
 import { BattlespacePage, type PanelState } from './BattlespacePage.tsx';
 import { ShellActions } from './ShellActions.tsx';
 import { TargetsPage } from './TargetsPage.tsx';
-import { StrategicPage } from './StrategicPage.tsx';
-import { DebriefPage } from './DebriefPage.tsx';
-import { EvidencePage } from './EvidencePage.tsx';
+import { OntologyPage } from './OntologyPage.tsx';
 import { usePresenter } from './presenter.ts';
 
-// The assistant brings the FDS AI kit (markdown, syntax highlighting): loaded on first visit so
-// the map's first load does not pay for it.
-const AssistantPage = lazy(() => import('./AssistantPage.tsx').then((m) => ({ default: m.AssistantPage })));
+// The assistant brings the FDS AI kit (markdown, syntax highlighting): loaded when it is first
+// opened, so the map's first load does not pay for it.
+const AssistantPanel = lazy(() => import('./AssistantPanel.tsx').then((m) => ({ default: m.AssistantPanel })));
 
-const NAV: NavItem[] = [
-  {
-    kind: 'section',
-    id: 'dss',
-    label: 'Decision System',
-    items: [
-      { id: 'battlespace', label: 'Battlespace', icon: <MapIcon size={NAV_ICON_SIZE} /> },
-      { id: 'strategic', label: 'Strategic', icon: <Landmark size={NAV_ICON_SIZE} /> },
-      { id: 'targets', label: 'Targets', icon: <Crosshair size={NAV_ICON_SIZE} /> },
-      { id: 'assistant', label: 'Assistant', icon: <MessageSquare size={NAV_ICON_SIZE} /> },
-      { id: 'debrief', label: 'Debrief', icon: <ClipboardCheck size={NAV_ICON_SIZE} /> },
-      { id: 'evidence', label: 'Evidence', icon: <FileCheck2 size={NAV_ICON_SIZE} /> },
-      { id: 'rehearsal', label: 'Rehearsal', icon: <PlayCircle size={NAV_ICON_SIZE} /> },
-      { id: 'factory', label: 'Factory', icon: <Factory size={NAV_ICON_SIZE} /> },
-      { id: 'ontology', label: 'Ontology', icon: <Network size={NAV_ICON_SIZE} /> },
-    ],
-  },
+/** The console's views, one page: a strip of tabs in place of a nav rail. Battlespace, Ontology and Targets. */
+const VIEWS: Array<{ id: string; label: string; icon: ComponentType<{ size?: number | string }> }> = [
+  { id: 'battlespace', label: 'Battlespace', icon: MapIcon },
+  { id: 'ontology', label: 'Ontology', icon: Network },
+  { id: 'targets', label: 'Targets', icon: Crosshair },
 ];
+const isView = (id: string) => VIEWS.some((v) => v.id === id);
 
 function wsUrl(): string {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -64,108 +51,119 @@ export function App() {
   );
 }
 
-/** Pages with their own scroll regions (canvas pages in the AppShell). */
-const CANVAS_PAGES = new Set(['battlespace', 'strategic', 'targets', 'assistant', 'debrief', 'evidence']);
-
 function Console() {
   const client = useClient();
   const view = useViewStore();
   const [page, setPage] = useState('battlespace');
   const [panels, setPanelState] = useState<PanelState>({ leftOpen: true, leftTab: 'layers', rightOpen: true });
-  // A question handed to the assistant from another page.
+  // The assistant docks beside the open view; it loads on first open and then stays mounted, so
+  // its conversation survives closing it and switching views.
+  const [assistant, setAssistant] = useState({ open: false, loaded: false });
+  // A question handed to the assistant from a view.
   const [pendingAsk, setPendingAsk] = useState<string | null>(null);
   const setPanels = useCallback((p: Partial<PanelState>) => setPanelState((s) => ({ ...s, ...p })), []);
+  // Below 1600 px the docked assistant would leave the map too narrow: the layers panel steps
+  // aside while it is open and comes back when it closes (unless the operator moved it meanwhile).
+  const stepAside = useRef(false);
+  const openAssistant = useCallback(
+    (open: boolean) => {
+      setAssistant((a) => ({ open, loaded: a.loaded || open }));
+      if (open && panels.leftOpen && window.innerWidth < 1600) {
+        stepAside.current = true;
+        setPanels({ leftOpen: false });
+      } else if (!open && stepAside.current) {
+        stepAside.current = false;
+        if (!panels.leftOpen) setPanels({ leftOpen: true });
+      }
+    },
+    [panels.leftOpen, setPanels],
+  );
   const derived = useDerived(250);
-  // Storyboard frames step from any page; a frame opens its own page (A4: Strategic).
+  // Storyboard frames step from any view; a frame opens its own view (A2: Ontology).
   const presenter = usePresenter(client, view, setPage);
-  const isCanvas = CANVAS_PAGES.has(page);
-  const label = NAV[0] && 'items' in NAV[0] ? NAV[0].items.find((i) => i.id === page)?.label : undefined;
+  const openOnMap = (id: string | null, highlight?: string[]) => {
+    view.set({ selected: id, highlight: highlight ?? [] });
+    setPage('battlespace');
+  };
+  const ask = (q: string) => {
+    setPendingAsk(q);
+    openAssistant(true);
+  };
+
+  const render = (id: string): ReactNode => {
+    switch (id) {
+      case 'battlespace':
+        return (
+          <BattlespacePage
+            derived={derived}
+            panels={panels}
+            setPanels={setPanels}
+            presenter={presenter}
+            onNominate={(id) => {
+              view.set({ selected: id });
+              setPage('targets');
+            }}
+            onAsk={ask}
+          />
+        );
+      case 'ontology':
+        return <OntologyPage presenter={presenter} onOpenOnMap={openOnMap} />;
+      case 'targets':
+        return <TargetsPage presenter={presenter} onOpenOnMap={openOnMap} />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <AppShell
-      navItems={NAV}
       activeId={page}
-      onNavigate={setPage}
-      workspace="Decision System"
-      defaultIsPinned={false}
+      // A link to a view (#/strategic) opens it; one to the assistant opens the panel.
+      onNavigate={(id) => (id === 'assistant' ? openAssistant(true) : isView(id) ? setPage(id) : undefined)}
+      collapsible="none"
+      trail={[{ label: 'Decision System' }]}
       profile={{ name: client.identity?.display ?? 'Connecting…', org: client.identity?.releasability.join(' · ') ?? '' }}
       unreadCount={derived.activeRules.length}
       onOpenNotifications={() => {
         setPage('battlespace');
         setPanels({ leftOpen: true, leftTab: 'alerts' });
       }}
+      onOpenAssistant={() => openAssistant(!assistant.open)}
+      isAssistantOpen={assistant.open}
+      panel={
+        assistant.loaded ? (
+          <Suspense fallback={null}>
+            <AssistantPanel
+              isOpen={assistant.open}
+              onDismiss={() => openAssistant(false)}
+              pending={pendingAsk}
+              onPendingTaken={() => setPendingAsk(null)}
+              onOpenOnMap={(id) => openOnMap(id)}
+            />
+          </Suspense>
+        ) : null
+      }
       actions={<ShellActions />}
-      pagePadding={isCanvas ? 'none' : 'default'}
-      pageHeight={isCanvas ? 'fill' : 'auto'}
+      pagePadding="none"
+      pageHeight="fill"
     >
-      {page === 'battlespace' ? (
-        <BattlespacePage
-          derived={derived}
-          panels={panels}
-          setPanels={setPanels}
-          presenter={presenter}
-          onNominate={(id) => {
-            view.set({ selected: id });
-            setPage('targets');
-          }}
-          onAsk={(q) => {
-            setPendingAsk(q);
-            setPage('assistant');
-          }}
-        />
-      ) : page === 'strategic' ? (
-        <StrategicPage
-          presenter={presenter}
-          onOpenOnMap={(id, highlight) => {
-            view.set({ selected: id, highlight: highlight ?? [] });
-            setPage('battlespace');
-          }}
-          onAsk={(q) => {
-            setPendingAsk(q);
-            setPage('assistant');
-          }}
-        />
-      ) : page === 'debrief' ? (
-        <DebriefPage
-          presenter={presenter}
-          onOpenOnMap={(id, highlight) => {
-            view.set({ selected: id, highlight: highlight ?? [] });
-            setPage('battlespace');
-          }}
-          onReplay={(from) => {
-            client.seek(from);
-            setPage('battlespace');
-            client.play(60);
-          }}
-        />
-      ) : page === 'evidence' ? (
-        <EvidencePage presenter={presenter} />
-      ) : page === 'targets' ? (
-        <TargetsPage
-          onOpenOnMap={(id, highlight) => {
-            view.set({ selected: id, highlight: highlight ?? [] });
-            setPage('battlespace');
-          }}
-        />
-      ) : page === 'assistant' ? (
-        <Suspense
-          fallback={
-            <div className="page-loading">
-              <Spinner size="Large" accessibilityLabel="Loading the assistant" />
-            </div>
-          }
-        >
-          <AssistantPage
-            pending={pendingAsk}
-            onPendingTaken={() => setPendingAsk(null)}
-            onOpenOnMap={(id) => {
-              view.set({ selected: id });
-              setPage('battlespace');
-            }}
-          />
-        </Suspense>
-      ) : (
-        <EmptyState title={`${label ?? 'This view'} is not in this build`} description="The Battlespace map engine is the milestone-1 slice; this section is on the DSS roadmap." />
-      )}
+      <Tabs className="bs-tabs-fill console" value={page} onChange={setPage} size="Small" variant="borderless">
+        <div className="console__tabs">
+          <TabList>
+            {VIEWS.map((v) => (
+              <TabItem key={v.id} value={v.id} leading={v.icon}>
+                {v.label}
+              </TabItem>
+            ))}
+          </TabList>
+        </div>
+        {/* Only the open view is mounted: the map's engine and each view's fetches run while it is shown. */}
+        {VIEWS.map((v) => (
+          <TabPanel key={v.id} value={v.id} className="console__view">
+            {page === v.id ? render(v.id) : null}
+          </TabPanel>
+        ))}
+      </Tabs>
     </AppShell>
   );
 }

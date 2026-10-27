@@ -5,8 +5,8 @@
  *    recent activity) · Provenance (source and registration, source, time, record) · Intel
  *    (reported evidence) · Links (linked objects, lineage thread) · Activity. Everything else:
  *    Overview (its own facts) · Provenance · Links · Activity. Actions pin to the foot.
- *  - Nothing selected: theatre summary — ring occupancy (ProgressBar meters), rules fired and
- *    raid groups (ActionList), fire units by defence layer (FireUnits).
+ *  - Nothing selected: theatre summary — hostile tracks per ring (Rings), rules fired (RulesFired),
+ *    raid groups (RaidGroups), fire units by defence layer (FireUnits).
  */
 import {
   ActionList,
@@ -33,8 +33,12 @@ import type { MapClient } from '@me/client';
 import { useClient, useEngineTime, useEvents, useLineage, useSelectedEntity, useViewStore } from '@me/map-react';
 import { SymbolGlyph } from './glyphs.tsx';
 import { FireUnits } from './FireUnits.tsx';
+import { Rings } from './Rings.tsx';
+import { RulesFired } from './RulesFired.tsx';
+import { RaidGroups } from './RaidGroups.tsx';
 import { MAG_COLOR, magState } from './magazine.ts';
 import { Facts, type Fact } from './Facts.tsx';
+import { Section } from './Section.tsx';
 import type { Derived } from './derived.ts';
 import { useHealth } from './health.ts';
 import { AGE_BADGE, AGE_WORD, ageLabel } from './age.ts';
@@ -98,7 +102,7 @@ function EntityInspector({ e, derived, onNominate, onAsk }: { e: Entity; derived
   const withdraw = async () => {
     try {
       await client.publish({ entity_id: e.entity_id, payload: { is_live: false } });
-      toast.show({ color: 'Positive', content: `“${e.aliases?.name ?? e.entity_id}” withdrawn.` });
+      toast.show({ color: 'Neutral', content: `“${e.aliases?.name ?? e.entity_id}” withdrawn.` });
       view.set({ selected: null });
     } catch (err) {
       toast.show({ color: 'Negative', content: (err as Error).message });
@@ -111,9 +115,11 @@ function EntityInspector({ e, derived, onNominate, onAsk }: { e: Entity; derived
           <span className="BodyXSmallMedium bs-muted bs-ellipsis">
             {ref} · {kindWord(e)}
           </span>
-          <Button iconOnly variant="ghost" tone="neutral" size="xs" aria-label="Clear selection" onClick={() => view.set({ selected: null, highlight: [] })}>
-            <X size={14} />
-          </Button>
+          <Tooltip content="Clear selection (Esc)">
+            <Button iconOnly variant="ghost" tone="neutral" size="xs" aria-label="Clear selection" onClick={() => view.set({ selected: null, highlight: [] })}>
+              <X size={14} />
+            </Button>
+          </Tooltip>
         </div>
         <div className="bs-insp__title">
           {sidc ? <SymbolGlyph sidc={sidc} size={20} title={CLASSES[e.ontology?.class ?? '']?.label} /> : null}
@@ -146,7 +152,7 @@ function EntityInspector({ e, derived, onNominate, onAsk }: { e: Entity; derived
         </div>
         <ScrollArea className="bs-scroll" viewportClassName="bs-scroll__viewport">
           <TabPanel value={first}>
-            <div className="bs-stack">
+            <div className="bs-divided">
               {e.classification ? <Hypotheses e={e} /> : null}
               {e.fragment ? <p className="BodySmallRegular bs-pad">{e.fragment.summary}</p> : null}
               <Facts items={overviewFacts(e, client, derived, t)} />
@@ -175,6 +181,7 @@ function EntityInspector({ e, derived, onNominate, onAsk }: { e: Entity; derived
             </div>
           </TabPanel>
           <TabPanel value="prov">
+            <div className="bs-divided">
             <Facts
               title="Source and registration"
               items={[
@@ -210,6 +217,7 @@ function EntityInspector({ e, derived, onNominate, onAsk }: { e: Entity; derived
                 !!e.releasability?.length && ['Releasable to', e.releasability.join(' · '), 'wide'],
               ]}
             />
+            </div>
           </TabPanel>
           {fusedTrack ? (
             <TabPanel value="intel">
@@ -217,59 +225,55 @@ function EntityInspector({ e, derived, onNominate, onAsk }: { e: Entity; derived
             </TabPanel>
           ) : null}
           <TabPanel value="links">
-            <div className="bs-stack">
-              <LinkedObjects e={e} t={t} />
-              <Lineage id={e.entity_id} />
-            </div>
+            <LinksTab e={e} t={t} />
           </TabPanel>
           <TabPanel value="activity">
             <EntityActivity id={e.entity_id} limit={60} />
           </TabPanel>
         </ScrollArea>
       </Tabs>
-      {operatorObject ? (
+      {/* One footer band, one line above it, whatever it holds. */}
+      {operatorObject || nominable ? (
         <div className="bs-insp__foot">
-          <div className="bs-insp__footbtns">
-            <Button size="sm" variant="secondary" tone="neutral" isFullWidth onClick={() => void withdraw()}>
-              Withdraw
-            </Button>
-            <Button size="sm" variant="secondary" tone="neutral" isFullWidth onClick={() => view.set({ selected: null })}>
-              Close
-            </Button>
-          </div>
-          <span className="BodyXSmallRegular bs-muted">Withdrawing removes it from the map. The original stays in the record.</span>
-        </div>
-      ) : null}
-      {nominable ? (
-        <div className="bs-insp__foot">
-          <div className="bs-insp__footbtns">
-            <Button size="sm" variant="primary" tone="brand" isFullWidth isDisabled={!onNominate} onClick={() => onNominate?.(e.entity_id)}>
-              Nominate to board
-            </Button>
-            <Button size="sm" variant="secondary" tone="neutral" isFullWidth isDisabled={!onAsk} onClick={() => onAsk?.(`Explain ${e.aliases?.track_number ?? e.entity_id}`)}>
-              Ask the assistant
-            </Button>
-          </div>
-          <span className="BodyXSmallRegular bs-muted">
-            {e.classification?.contested ? 'Contested entities can be nominated; hypotheses travel with the card. ' : ''}
-            The board shows its pairing options and checks; the assistant explains it from the record.
-          </span>
+          {operatorObject ? (
+            <div className="bs-insp__footbtns">
+              {/* Close, then the withdrawal: the order and tones of the alert and source dialogs. */}
+              <Button size="sm" variant="secondary" tone="neutral" isFullWidth onClick={() => view.set({ selected: null })}>
+                Close
+              </Button>
+              <Tooltip content="Removes it from the map; the original stays in the record">
+                <Button size="sm" variant="primary" tone="negative" isFullWidth onClick={() => void withdraw()}>
+                  Withdraw
+                </Button>
+              </Tooltip>
+            </div>
+          ) : null}
+          {nominable ? (
+            <div className="bs-insp__footbtns">
+              <Tooltip content={`${e.classification?.contested ? 'Hypotheses travel with the card. ' : ''}The board shows its pairing options and checks`}>
+                <Button size="sm" variant="primary" tone="brand" isFullWidth isDisabled={!onNominate} onClick={() => onNominate?.(e.entity_id)}>
+                  Nominate to board
+                </Button>
+              </Tooltip>
+              <Tooltip content="The assistant explains it from the record">
+                <Button size="sm" variant="secondary" tone="neutral" isFullWidth isDisabled={!onAsk} onClick={() => onAsk?.(`Explain ${e.aliases?.track_number ?? e.entity_id}`)}>
+                  Ask the assistant
+                </Button>
+              </Tooltip>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
   );
 }
 
-/** Hypotheses within margin, with the (not yet live) corrections. */
+/** Hypotheses within margin, the leading one selected. */
 function Hypotheses({ e }: { e: Entity }) {
   const c = e.classification!;
   const evidence = e.track?.sensor_classes?.length ? e.track.sensor_classes.join(' + ') : (e.provenance.sensor_class ?? e.provenance.source_feed);
   return (
-    <section className="bs-stack bs-pad">
-      <div className="bs-insp__sechead">
-        <span className="BodySmallSemibold">Hypotheses within margin</span>
-        <span className="BodyXSmallRegular bs-muted bs-num">margin {c.margin.toFixed(2)}</span>
-      </div>
+    <Section title="Hypotheses within margin" trailing={<span className="BodyXSmallRegular bs-muted bs-num">margin {c.margin.toFixed(2)}</span>}>
       {c.hypotheses.map((h, i) => {
         const lk = LIKELIHOOD(h.p);
         return (
@@ -286,22 +290,7 @@ function Hypotheses({ e }: { e: Entity }) {
           </Card>
         );
       })}
-      <div className="bs-row">
-        <Button size="xs" variant="secondary" tone="neutral" isDisabled>
-          Reject
-        </Button>
-        <Button size="xs" variant="secondary" tone="neutral" isDisabled>
-          Merge
-        </Button>
-        <Button size="xs" variant="secondary" tone="neutral" isDisabled>
-          Reclassify
-        </Button>
-      </div>
-      <span className="BodyXSmallRegular bs-muted">
-        {c.contested ? 'Not merged: hypotheses stay separate until an operator adjudicates. ' : ''}
-        Corrections write labelled records to the journal in the next build.
-      </span>
-    </section>
+    </Section>
   );
 }
 
@@ -351,6 +340,8 @@ function overviewFacts(e: Entity, client: MapClient, derived: Derived, t: number
     e.sensor && ['Status', e.sensor.status],
     e.plant && ['Plant state', e.plant.state.replaceAll('_', ' ')],
     e.plant && ['Tier', `Tier ${e.plant.tier}`],
+    e.plant?.rank !== undefined && ['Rank', `${e.plant.rank} · RIL-reviewed`],
+    e.plant?.interlock && ['Interlock', e.plant.interlock],
     // Intel fragments.
     e.fragment && ['Source', e.fragment.source_kind.replaceAll('_', ' ')],
     e.fragment && ['Confidence', <Badge size="Small" color={e.fragment.confidence === 'confirmed' ? 'Positive' : e.fragment.confidence === 'likely' ? 'Notice' : 'Neutral'} emphasis="Subtle" label={e.fragment.confidence.toUpperCase()} />],
@@ -363,10 +354,14 @@ function overviewFacts(e: Entity, client: MapClient, derived: Derived, t: number
     gd && e.geo_shape && ['Type', GEO_WORD[gd.type] ?? gd.type.replaceAll('_', ' ').replace(/^\w/, (c) => c.toUpperCase())],
     e.geo_shape && ['Size', shapeSummary(e.geo_shape)],
     gd?.ring && ['Ring', gd.ring],
+    // A predicted aimpoint's time on target is a forecast, counted from the picture time.
+    gd?.tot !== undefined && ['Time on target', `${raidLabel(gd.tot, client.scenario?.clock)} · ${gd.tot > t ? `in ${Math.ceil((gd.tot - t) / 60_000)} min` : 'passed'} · forecast`, 'wide'],
     gd?.wcs && ['Weapons control', <Badge size="Small" color={gd.wcs === 'free' ? 'Negative' : gd.wcs === 'tight' ? 'Notice' : 'Positive'} emphasis="Subtle" label={gd.wcs.toUpperCase()} />],
     gd?.tier !== undefined && !e.plant && ['Tier', `Tier ${gd.tier}`],
     gd?.watch && ['Alert on', gd.watch === 'any' ? 'Any track' : `${gd.watch[0]!.toUpperCase()}${gd.watch.slice(1)} tracks`],
     gd?.type === 'geofence' && e.geo_shape && ['Inside now', String(insideNow(client, e.geo_shape, gd.watch ?? 'hostile', t))],
+    // Operator objects: the layer it sits in (a withdrawn layer's objects are back in Operator objects).
+    e.provenance.integration === 'console' && e.geo_shape && ['Layer', (gd?.layer && client.entities.get(gd.layer)?.aliases?.name) || 'Operator objects', 'wide'],
     gd?.author && ['Author', gd.author, 'wide'],
     gd?.note && ['Note', gd.note, 'wide'],
   ];
@@ -387,20 +382,23 @@ function ChainBadge() {
   );
 }
 
-function Lineage({ id }: { id: string }) {
+/** The records that matter in a lineage: what an entity came from or led to, not the bare observations. */
+const meaningfulOf = (records: JournalRecord[]) => records.filter((r) => r.kind !== 'observation' && !(r.kind === 'fused' && !r.derived_from?.length));
+
+function Lineage({ id, meaningful }: { id: string; meaningful: JournalRecord[] }) {
   const client = useClient();
   const view = useViewStore();
-  const { records, loading } = useLineage(id);
   const clock = client.scenario?.clock;
-  const meaningful = records.filter((r) => r.kind !== 'observation' && !(r.kind === 'fused' && !r.derived_from?.length));
   return (
-    <div className="bs-stack">
-      <div className="bs-insp__sechead bs-pad">
-        <span className="BodySmallSemibold">Lineage · {loading ? '…' : meaningful.length}</span>
+    <Section
+      title="Lineage"
+      count={meaningful.length}
+      trailing={
         <Button size="xs" variant="secondary" tone="neutral" onClick={() => view.set({ highlight: meaningful.map((r) => r.entity_id ?? '').filter(Boolean) })}>
           Trace on map
         </Button>
-      </div>
+      }
+    >
       <ActionList accessibilityLabel="Lineage records">
         {meaningful.map((r) => {
           const s = eventSummary(r);
@@ -409,15 +407,15 @@ function Lineage({ id }: { id: string }) {
               key={r.record_id}
               value={r.record_id}
               title={s.title}
-              description={`${r.kind} · ${shortHash(r.hash)}`}
+              // The time leads the second line (as in the event feed), so nothing is pushed past the row.
+              description={`${raidLabel(r.ingest_time, clock)} · ${r.kind} · ${shortHash(r.hash)}`}
               leading={<ActionListItemIcon icon={KIND_ICON[r.kind as keyof typeof KIND_ICON] ?? Boxes} />}
-              trailing={<ActionListItemText>{raidLabel(r.ingest_time, clock)}</ActionListItemText>}
               onClick={() => s.subject && s.subject !== id && view.set({ selected: s.subject })}
             />
           );
         })}
       </ActionList>
-    </div>
+    </Section>
   );
 }
 
@@ -428,9 +426,10 @@ function Evidence({ e }: { e: Entity }) {
   const clock = client.scenario?.clock;
   const sensors = (e.track?.contributing ?? []).map((id) => ({ id, s: client.entities.get(id) }));
   const intel = records.filter((r) => r.kind === 'fragment');
+  // Nothing reported: no heading, no section.
+  if (!sensors.length && !intel.length) return <p className="BodySmallRegular bs-muted bs-pad">{loading ? 'Loading…' : 'No reported evidence yet.'}</p>;
   return (
-    <section className="bs-stack bs-pad" aria-label="Reported evidence">
-      <span className="BodySmallSemibold">Reported evidence</span>
+    <Section title="Reported evidence">
       {sensors.map(({ id, s }) => (
         <Card key={id} padding={12} size="Medium">
           <span className="bs-hcard__text">
@@ -454,8 +453,7 @@ function Evidence({ e }: { e: Entity }) {
           </Card>
         );
       })}
-      {!sensors.length && !intel.length ? <span className="BodySmallRegular bs-muted">{loading ? 'Loading…' : 'No reported evidence yet.'}</span> : null}
-    </section>
+    </Section>
   );
 }
 
@@ -466,6 +464,22 @@ interface Link {
   text: string;
   ref: string;
   icon: LinkIcon;
+}
+
+/** The Links tab: linked objects and lineage, each only when it has something to show. */
+function LinksTab({ e, t }: { e: Entity; t: number }) {
+  const client = useClient();
+  const events = useEvents();
+  const links = linksOf(e, client, events, t);
+  const { records, loading } = useLineage(e.entity_id);
+  const meaningful = meaningfulOf(records);
+  if (!links.length && !meaningful.length) return <p className="BodySmallRegular bs-muted bs-pad">{loading ? 'Loading…' : 'No linked records.'}</p>;
+  return (
+    <div className="bs-divided">
+      {links.length ? <LinkedObjects links={links} /> : null}
+      {meaningful.length ? <Lineage id={e.entity_id} meaningful={meaningful} /> : null}
+    </div>
+  );
 }
 
 /** Objects related to e right now: areas it is inside, its group, sensors, nearest fire unit, engagements. */
@@ -515,14 +529,11 @@ function linksOf(e: Entity, client: MapClient, events: JournalRecord[], t: numbe
   return out.slice(0, 24);
 }
 
-function LinkedObjects({ e, t }: { e: Entity; t: number }) {
-  const client = useClient();
+function LinkedObjects({ links }: { links: Link[] }) {
   const view = useViewStore();
-  const events = useEvents();
-  const links = linksOf(e, client, events, t);
   return (
-    <ActionList accessibilityLabel="Linked objects">
-      <ActionListSection title={links.length ? `Linked objects · ${links.length}` : 'Linked objects · none'}>
+    <Section title="Linked objects" count={links.length}>
+      <ActionList accessibilityLabel="Linked objects">
         {links.map((l) => (
           <ActionListItem
             key={l.key}
@@ -533,8 +544,8 @@ function LinkedObjects({ e, t }: { e: Entity; t: number }) {
             onClick={() => view.set({ selected: l.ref })}
           />
         ))}
-      </ActionListSection>
-    </ActionList>
+      </ActionList>
+    </Section>
   );
 }
 
@@ -549,10 +560,11 @@ function EntityActivity({ id, limit, hideEmpty = false }: { id: string; limit: n
     const p = r.payload as { effector_id?: string; rule_id?: string } | undefined;
     if (r.entity_id === id || s.subject === id || p?.effector_id === id || p?.rule_id === `geofence:${id}`) mine.push(r);
   }
-  if (hideEmpty && !mine.length) return null;
+  // Nothing received: no heading, no section (the tab says so in a line).
+  if (!mine.length) return hideEmpty ? null : <p className="BodySmallRegular bs-muted bs-pad">No activity received yet.</p>;
   return (
-    <ActionList accessibilityLabel="Entity activity">
-      <ActionListSection title={mine.length ? 'Activity' : 'Activity · none received yet'}>
+    <Section title="Activity">
+      <ActionList accessibilityLabel="Entity activity">
         {mine.map((r) => {
           const s = eventSummary(r);
           return (
@@ -560,72 +572,25 @@ function EntityActivity({ id, limit, hideEmpty = false }: { id: string; limit: n
               key={r.record_id}
               value={r.record_id}
               title={s.title}
-              description={s.detail}
+              description={s.detail ? `${raidLabel(r.ingest_time, clock)} · ${s.detail}` : raidLabel(r.ingest_time, clock)}
               leading={<ActionListItemIcon icon={KIND_ICON[r.kind as keyof typeof KIND_ICON] ?? Boxes} />}
-              trailing={<ActionListItemText>{raidLabel(r.ingest_time, clock)}</ActionListItemText>}
             />
           );
         })}
-      </ActionListSection>
-    </ActionList>
+      </ActionList>
+    </Section>
   );
 }
 
 function TheatreSummary({ derived }: { derived: Derived }) {
   const client = useClient();
-  const view = useViewStore();
   const threshold = client.scenario?.counts.saturationThreshold ?? 0;
-  const ringMax = Math.max(1, threshold, ...Object.values(derived.rings));
-  const rings: Array<[keyof Derived['rings'], string, 'Information' | 'Notice' | 'Negative']> = [
-    ['R4', '150–60 km', 'Information'],
-    ['R3', '60–20 km', derived.rings.R3 > threshold ? 'Notice' : 'Information'],
-    ['R2', '20–5 km', 'Notice'],
-    ['R1', '5–0 km', 'Negative'],
-  ];
   return (
     <ScrollArea className="bs-scroll" viewportClassName="bs-scroll__viewport">
-      <div className="bs-stack">
-        <section className="bs-stack bs-pad" aria-label="Hostile tracks per ring">
-          <span className="BodySmallSemibold">Rings · hostile tracks</span>
-          {rings.map(([k, span, color]) => (
-            <ProgressBar key={k} type="meter" color={color} value={derived.rings[k]} max={ringMax} label={`${k} · ${span} · ${derived.rings[k]}${k === 'R3' && threshold ? ` / ${threshold} channels` : ''}`} />
-          ))}
-        </section>
-        <ActionList accessibilityLabel="Rules and raid groups">
-          {derived.activeRules.length ? (
-            <ActionListSection title={`Rules fired · ${derived.activeRules.length}`}>
-              {derived.activeRules.map((r) => {
-                // A geofence reads as the fence and its count; the latest entry or exit is the detail.
-                const fence = r.payload.rule === 'geofence' ? client.entities.get(r.payload.rule_id.slice('geofence:'.length)) : undefined;
-                const title = fence ? `${fence.aliases?.name ?? fence.entity_id} · ${r.payload.value ?? 0} inside` : eventSummary(r).title;
-                return (
-                  <ActionListItem
-                    key={r.record_id}
-                    value={r.record_id}
-                    title={title}
-                    description={r.payload.note ?? ''}
-                    intent="negative"
-                    leading={<ActionListItemIcon icon={TriangleAlert} />}
-                    {...(fence ? { onClick: () => view.set({ selected: fence.entity_id }) } : {})}
-                  />
-                );
-              })}
-            </ActionListSection>
-          ) : null}
-          <ActionListSection title={`Raid groups · ${derived.groups.length}`}>
-            {derived.groups.map((g) => (
-              <ActionListItem
-                key={g.entity_id}
-                value={g.entity_id}
-                title={g.aliases?.name ?? g.entity_id}
-                description={`${g.group?.axis ?? ''} · ${g.group?.wave ?? ''}`}
-                leading={<ActionListItemIcon icon={Boxes} />}
-                trailing={<ActionListItemText>{String(g.group?.members.length ?? 0)}</ActionListItemText>}
-                onClick={() => view.set({ selected: g.entity_id, highlight: g.group?.members ?? [] })}
-              />
-            ))}
-          </ActionListSection>
-        </ActionList>
+      <div className="bs-divided">
+        <Rings rings={derived.rings} channels={threshold} />
+        <RulesFired rules={derived.activeRules} />
+        <RaidGroups groups={derived.groups} />
         <FireUnits effectors={derived.effectors} />
       </div>
     </ScrollArea>

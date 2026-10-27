@@ -17,6 +17,8 @@ export const OPERATOR_SEQ_BASE = 1_000_000_000;
 
 /** Rule id carried by a geofence's firings. */
 export const geofenceRuleId = (entityId: string): string => `geofence:${entityId}`;
+/** Rule ids owned by an operator object (geofences, custom alerts): its withdrawal supersedes later firings. */
+const OPERATOR_RULES = ['geofence:', 'alert:'];
 
 export class OperatorLog {
   private chain: JournalRecord[] = [];
@@ -99,8 +101,8 @@ export class OperatorLog {
   }
 
   /**
-   * Records with from < ingest_time <= to, ascending in time. A geofence's firings after the
-   * geofence was withdrawn are superseded and not returned.
+   * Records with from < ingest_time <= to, ascending in time. A geofence's or custom alert's
+   * firings after it was withdrawn are superseded and not returned.
    */
   between(from: number, to: number): JournalRecord[] {
     const out: JournalRecord[] = [];
@@ -134,11 +136,13 @@ export class OperatorLog {
     return s.size;
   }
 
+  /** Firings of an operator's rule (a geofence or a custom alert) after its withdrawal. */
   private superseded(r: JournalRecord): boolean {
     if (r.kind !== 'rule_fire') return false;
     const id = (r.payload as RuleFirePayload).rule_id;
-    if (!id.startsWith('geofence:')) return false;
-    const at = this.withdrawn.get(id.slice('geofence:'.length));
+    const owner = OPERATOR_RULES.find((p) => id.startsWith(p));
+    if (!owner) return false;
+    const at = this.withdrawn.get(id.slice(owner.length));
     return at !== undefined && r.ingest_time > at;
   }
 }

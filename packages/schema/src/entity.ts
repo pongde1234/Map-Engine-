@@ -150,6 +150,9 @@ export const GeoType = z.enum([
   'coverage',
   'geofence', // operator-drawn: tracks entering or leaving it fire a rule
   'measure', // operator-drawn: a kept measurement
+  'alert', // operator-set: a custom alert rule (no shape); the rules engine fires it
+  'source', // operator-set: a registered sensor or feed (no shape, no data)
+  'layer', // operator-set: a named layer that drawn objects sit in (no shape)
 ]);
 export type GeoType = z.infer<typeof GeoType>;
 
@@ -174,6 +177,9 @@ export const GeoDetails = z.object({
   author: z.string().optional(),
   /** Operator objects: free note. */
   note: z.string().optional(),
+  /** Operator objects: the operator layer it sits in (that layer's entity id). Without one, or once
+   *  that layer is withdrawn, it sits in "Operator objects". */
+  layer: z.string().optional(),
 });
 export type GeoDetails = z.infer<typeof GeoDetails>;
 
@@ -304,10 +310,51 @@ export type FragmentInfo = z.infer<typeof FragmentInfo>;
 export const PlantUnit = z.object({
   unit: z.string(),
   tier: z.number().int().min(1).max(3),
+  /** RIL-reviewed vulnerability rank, set in phase 0 (1 = most vulnerable). */
+  rank: z.number().int().min(1).optional(),
   state: z.enum(['running', 'depressurised', 'feed_isolated', 'shutdown', 'restart_assessment']),
+  /** The unit's protective interlock: in service, or tripped by a protective action. One generic state, no sequence. */
+  interlock: z.enum(['armed', 'tripped']).optional(),
   note: z.string().optional(),
 });
 export type PlantUnit = z.infer<typeof PlantUnit>;
+
+/**
+ * A custom alert an operator sets in the Alerts panel. The rules engine walks the picture from the
+ * time it was set and journals each firing and clearing with the operator's severity. Every number
+ * here is the operator's own; nothing is supplied by the console.
+ *   count_in_ring  watched tracks inside a ring (or the whole picture) reach `count`
+ *   near_vp        a watched track comes within `distance_m` of the defended point
+ *   magazine_low   a fire unit (`unit`, or any) is at `ready` rounds or fewer (or at its floor)
+ *   class_appears  a track of one of `classes` enters the picture
+ */
+export const AlertRule = z.object({
+  condition: z.enum(['count_in_ring', 'near_vp', 'magazine_low', 'class_appears']),
+  watch: z.enum(['hostile', 'unidentified', 'any']).optional(),
+  ring: z.enum(['R1', 'R2', 'R3', 'R4', 'all']).optional(),
+  count: z.number().int().min(1).optional(),
+  distance_m: z.number().positive().optional(),
+  unit: z.string().optional(),
+  ready: z.number().int().min(0).optional(),
+  classes: z.array(z.string()).optional(),
+  severity: z.enum(['high', 'medium', 'low']).default('high'),
+});
+export type AlertRule = z.infer<typeof AlertRule>;
+
+/**
+ * A source an operator registers in the Sources panel: a sensor or feed the picture does not carry
+ * yet. It is a record only: it carries no data, never ages and is listed as planned. The range is
+ * the operator's own; none is supplied by the console.
+ *   sensor  `sensor_type`, and `range_m` when the operator states it
+ *   feed    what it `carries`
+ */
+export const SourceEntry = z.object({
+  kind: z.enum(['sensor', 'feed']),
+  sensor_type: Sensor.shape.type.optional(),
+  range_m: z.number().positive().optional(),
+  carries: z.enum(['tracks', 'intel', 'status']).optional(),
+});
+export type SourceEntry = z.infer<typeof SourceEntry>;
 
 /**
  * Components an entity record may carry. A record replaces each component it carries
@@ -333,6 +380,8 @@ export const EntityComponents = z.object({
   indicators: Indicators.optional(),
   fragment: FragmentInfo.optional(),
   plant: PlantUnit.optional(),
+  alert_rule: AlertRule.optional(),
+  source_entry: SourceEntry.optional(),
 });
 export type EntityComponents = z.infer<typeof EntityComponents>;
 export type ComponentKey = keyof EntityComponents;

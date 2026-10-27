@@ -160,7 +160,9 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
         mil_view: { identity: 'friend', environment: 'land', sidc: CLASSES.process_unit!.sidc, context: 'reality' },
         geo_shape: { type: 'circle', center: u.at, radius_m: u.halfSizeM },
         geo_details: { type: 'vp', tier: u.tier, label: u.name.toUpperCase(), status: 'active' },
-        plant: { unit: u.name, tier: u.tier, state: 'running' },
+        // Phase 0: the RIL-reviewed rank and every unit's protective interlock in service (synthetic).
+        plant: { unit: u.name, tier: u.tier, rank: u.rank, state: 'running', interlock: 'armed' },
+        relationships: [{ type: 'member_of', target: 'VP-RIL' }],
         indicators: { notional: true },
       } satisfies EntityComponents,
     });
@@ -248,6 +250,62 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
       } satisfies EntityComponents,
     });
   }
+  // ============================================================ rehearsal (phase 0)
+  // The proposed source-disagreement fixture, outside the raid timeline: two radar reports on one
+  // rehearsal track disagree, and the assessment derived from both keeps two hypotheses (contested,
+  // not merged). Recorded two days before the scenario opens, labelled REHEARSAL and expired at
+  // once, so it never enters the picture or the map; the Ontology Explorer reads it by its thread.
+  const TH_REH = 'TH-REH-0001';
+  {
+    const tR = T0 - 2 * DAYS(1);
+    const label = 'SYNTHETIC//REHEARSAL';
+    const at = destination(VP, 330, 95_000);
+    const report = (sensorId: string, cls: 'owa_drone' | 'civil_air', p: LonLat, hae: number, dt: number): string => {
+      const s = SENSORS.find((x) => x.id === sensorId)!;
+      return E.emit('observation', 'observation', {
+        entity_id: `O:${sensorId}:REH-1`,
+        source_time: tR + dt,
+        ingest_time: tR + dt + 900,
+        provenance: { ...(s.cls === 'coastal_radar' ? P.coastal : P.armyAd), sensor_class: sensorClassOf(sensorId) },
+        thread_id: TH_REH,
+        releasability: REL_JOINT,
+        label,
+        payload: {
+          ontology: { template: 'track', class: cls },
+          location: { lon: p[0], lat: p[1], hae },
+          mil_view: { identity: cls === 'civil_air' ? 'neutral' : 'suspect', environment: 'air', sidc: CLASSES[cls]!.sidc, context: 'exercise' },
+          track: { state: 'detected', contributing: [sensorId], sensor_classes: [sensorClassOf(sensorId)] },
+          relationships: [{ type: 'associated_with', target: 'REH-1' }],
+          indicators: { exercise: true, notional: true },
+          expiry_time: tR + dt + 40 * SECOND,
+        } satisfies EntityComponents,
+      });
+    };
+    const a = report('S-LLR1', 'owa_drone', at, 300, 0);
+    const b = report('S-CR1', 'civil_air', destination(at, 60, 1400), 900, 4 * SECOND);
+    const h = (c: string, p: number) => ({ class: c, label: CLASSES[c]!.label, sidc: CLASSES[c]!.sidc, p });
+    E.emit('fused', 'fused', {
+      entity_id: 'REH-1',
+      source_time: tR + 6 * SECOND,
+      ingest_time: tR + 8 * SECOND,
+      provenance: P.fused,
+      thread_id: TH_REH,
+      derived_from: [a, b],
+      releasability: REL_JOINT,
+      label,
+      payload: {
+        ontology: { template: 'track', class: 'unknown_air' },
+        aliases: { track_number: 'REH-1', name: 'Rehearsal track' },
+        location: { lon: destination(at, 60, 700)[0], lat: destination(at, 60, 700)[1], hae: 600 },
+        mil_view: { identity: 'pending', environment: 'air', sidc: CLASSES.unknown_air!.sidc, context: 'exercise' },
+        classification: { hypotheses: [h('owa_drone', 0.54), h('civil_air', 0.46)], contested: true, margin: 0.08 },
+        track: { state: 'detected', contributing: ['S-LLR1', 'S-CR1'], sensor_classes: [sensorClassOf('S-LLR1'), sensorClassOf('S-CR1')], fusion_version: 'fallback:truth+noise v0' },
+        indicators: { exercise: true, notional: true },
+        expiry_time: tR + MINUTE,
+      } satisfies EntityComponents,
+    });
+  }
+
   // Fault forecast, swap after DP-1.
   E.emit('fused', 'fused', {
     entity_id: 'S-LLR1',
@@ -278,6 +336,7 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
         wez: e.wez,
       },
       health: { link: 'up' },
+      relationships: [{ type: 'protects', target: 'VP-RIL' }],
       indicators: { notional: true },
     };
   };
@@ -420,6 +479,19 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
       geo_details: { type: 'annotation', label: 'DELEGATION TRIGGERS · N, T UNSPECIFIED', status: 'active' },
     } satisfies EntityComponents,
   });
+
+  // The package sets the missile reserve floors: each fire unit's magazine record on file from here
+  // derives from DP-0, so the phase-0 preparation records trace back to the approval.
+  for (const e of EFFECTORS.filter((x) => x.floor > 0)) {
+    E.emit('fused', 'fused', {
+      entity_id: e.id,
+      source_time: dp0T + 2 * MINUTE,
+      provenance: P.force,
+      derived_from: [refs.dp0],
+      releasability: REL_JOINT,
+      payload: { effector: effectorPayload(e, e.peace ?? e.at).effector } satisfies EntityComponents,
+    });
+  }
 
   // DP-1: posture raised under the package, on the indications.
   const dp1T = d3 + 11 * HOUR + 30 * MINUTE;
@@ -899,8 +971,8 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
     rel: REL_PLANT,
     payload: { dp: 'DP-8', title: 'Plant protective action', layer: 'RIL', status: 'executed', authority: 'RIL L4 · L3 advisory', summary: 'Crude unit depressurised; catalytic cracker feed isolated under the pre-agreed trigger.', options: [] },
   });
-  plantState('PU-CDU', 'depressurised', advisoryT + 3 * MINUTE, refs.dp8);
-  plantState('PU-FCC', 'feed_isolated', advisoryT + 3 * MINUTE + 40 * SECOND, refs.dp8);
+  plantState('PU-CDU', 'depressurised', advisoryT + 3 * MINUTE, refs.dp8, 'tripped');
+  plantState('PU-FCC', 'feed_isolated', advisoryT + 3 * MINUTE + 40 * SECOND, refs.dp8, 'tripped');
 
   // Interceptor ISR sortie that classifies the leading decoy group (B2).
   const decoys = threats.filter((t) => t.cls === 'decoy');
@@ -1372,8 +1444,8 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
       expiry_time: H + 2 * DAYS(1),
     } satisfies EntityComponents,
   });
-  plantState('PU-CDU', 'restart_assessment', H + 50 * MINUTE, bdaUnits);
-  plantState('PU-FCC', 'restart_assessment', H + 50 * MINUTE, bdaUnits);
+  plantState('PU-CDU', 'restart_assessment', H + 50 * MINUTE, bdaUnits, 'tripped');
+  plantState('PU-FCC', 'restart_assessment', H + 50 * MINUTE, bdaUnits, 'tripped');
   decision({ t: H + 50 * MINUTE, derived: [bdaTank, bdaUnits], author: 'RIL L4 + L2', rel: REL_PLANT, payload: { dp: 'DP-9', title: 'Restart / continued shutdown', layer: 'RIL', status: 'proposed', authority: 'RIL L4 + L2', summary: 'Restart assessment opened; re-attack risk still visible.', options: [] } });
   decision({ t: H + 42 * MINUTE, derived: [bdaTank, bdaUnits], author: 'L1 (MoD / PIB / MEA) with state', rel: ['NATIONAL'], payload: { dp: 'DP-10', title: 'Public narrative support', layer: 'L1', status: 'proposed', authority: 'L1 + state', summary: 'Verified events separated from unverified claims; unverified items held back.', options: [] } });
   decision({ t: H + 42 * MINUTE + 30 * SECOND, derived: [bdaUnits], author: 'L1 only', rel: ['NATIONAL'], payload: { dp: 'DP-11', title: 'Counter-strike / response', layer: 'L1', status: 'option', authority: 'L1 only', summary: 'Labelled as options with escalation estimates. Attribution pending; no response approved.', options: [{ id: 'respond', label: 'Response options (labelled)', selected: false }] } });
@@ -1449,7 +1521,7 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
     zoom: 7.2,
     counts,
     conflicts: CONFLICTS,
-    threads: { iw: TH_IW, raid: TH_RAID },
+    threads: { iw: TH_IW, raid: TH_RAID, rehearsal: TH_REH },
     notes: ['All force numbers, placements and raid timelines are notional.', 'Fused tracks are truth + noise (fallback) until the fusion step lands.'],
   };
 
@@ -1499,7 +1571,12 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
     return E.emit('engagement', 'event', { source_time: t, ingest_time: t + 500, provenance: P.armyAd, payload: p, thread_id: TH_RAID, derived_from: derived, releasability: REL_JOINT });
   }
 
-  function plantState(id: string, state: 'depressurised' | 'feed_isolated' | 'restart_assessment', t: number, derivedFrom: string): void {
+  /**
+   * A unit's new process state. A record replaces the whole plant component, so the rank and the
+   * interlock travel with every state: the interlock trips with the protective action and stays
+   * tripped until a restart decision (DP-9) resets it. One generic state; no operating sequence.
+   */
+  function plantState(id: string, state: 'depressurised' | 'feed_isolated' | 'restart_assessment', t: number, derivedFrom: string, interlock: 'armed' | 'tripped'): void {
     const u = PROCESS_UNITS.find((p) => p.id === id)!;
     E.emit('reference', 'reference', {
       entity_id: id,
@@ -1508,7 +1585,7 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
       derived_from: [derivedFrom],
       thread_id: TH_RAID,
       releasability: REL_PLANT,
-      payload: { plant: { unit: u.name, tier: u.tier, state } },
+      payload: { plant: { unit: u.name, tier: u.tier, rank: u.rank, state, interlock } },
     });
   }
 

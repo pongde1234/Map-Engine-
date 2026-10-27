@@ -8,3 +8,4 @@ export * from './engine.ts';
 export * from './cursor.ts';
 export * from './operator.ts';
 export * from './geofence.ts';
+export * from './alerts.ts';

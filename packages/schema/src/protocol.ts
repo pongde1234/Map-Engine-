@@ -45,6 +45,8 @@ export interface ScenarioInfo {
   center: [number, number];
   zoom: number;
   counts: Record<string, number>;
+  /** Named threads, e.g. `rehearsal` (the labelled rehearsal track, outside the raid timeline). */
+  threads?: Record<string, string>;
 }
 
 /**

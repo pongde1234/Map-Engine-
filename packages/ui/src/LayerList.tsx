@@ -1,10 +1,12 @@
 /**
  * Layer list: FDS TreeView with cascading checkboxes (a section's checkbox shows or hides the
- * whole section), an icon per layer, and trailing newest-data age Badge + Counter. SearchInput
- * filters the rows.
+ * whole section), an icon per layer, and a trailing Counter, with a newest-data age Badge only
+ * when that data is no longer current. Sections start collapsed; SearchInput filters the rows.
+ * The operator's own layers sit under Command, each with its own toggle; "New layer" makes one
+ * (OperatorLayers.tsx).
  */
 import { useState, type ComponentType } from 'react';
-import { Badge, Counter, ScrollArea, SearchInput, TreeView, TreeViewItem } from '@faclon-labs/fds';
+import { Badge, Button, Counter, IconButton, ScrollArea, SearchInput, Tooltip, TreeView, TreeViewItem } from '@faclon-labs/fds';
 import {
   ArrowUpRight,
   Ban,
@@ -12,10 +14,13 @@ import {
   CircleDashed,
   CircleHelp,
   Crosshair,
+  Ellipsis,
   Factory,
   FileSearch,
+  Layers,
   MoveRight,
   Plane,
+  Plus,
   Radar,
   Route,
   Shield,
@@ -27,10 +32,11 @@ import {
   Zap,
  PenLine } from 'lucide-react';
 import type { AgeState } from '@me/schema';
-import { useView, useViewStore } from '@me/map-react';
-import type { LayerKey } from '@me/map';
+import { useClient, useView, useViewStore } from '@me/map-react';
+import { operatorLayerKey, type LayerKey } from '@me/map';
 import type { Derived, LayerStat } from './derived.ts';
 import { ageLabel, AGE_BADGE } from './age.ts';
+import { LayerEntryModal, operatorLayers, operatorObjectCounts } from './OperatorLayers.tsx';
 
 type Icon = ComponentType<{ size?: number | string }>;
 
@@ -42,6 +48,8 @@ interface Row {
   count?: (d: Derived) => number;
   /** Newest-data age chip (live layers only; command/reference objects are authored). */
   age?: boolean;
+  /** An operator layer: the row offers its details (review, withdraw). */
+  layerId?: string;
 }
 
 interface Section {
@@ -105,11 +113,37 @@ const SECTIONS: Section[] = [
 ];
 
 export function LayerList({ derived }: { derived: Derived }) {
+  const client = useClient();
   const view = useViewStore();
   const layers = useView((s) => s.layers);
   const [q, setQ] = useState('');
+  // The layer dialog: a new layer (id null) or one to review and withdraw.
+  const [dialog, setDialog] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
   const query = q.trim().toLowerCase();
-  const sections = SECTIONS.map((sec) => ({
+  // "Operator objects" counts drawn objects in no layer; each operator layer follows it.
+  const counts = operatorObjectCounts(client);
+  const withOperatorLayers = SECTIONS.map((sec) =>
+    sec.key !== 'command'
+      ? sec
+      : {
+          ...sec,
+          rows: sec.rows.flatMap((r): Row[] =>
+            r.key !== 'command.operator'
+              ? [r]
+              : [
+                  { ...r, count: () => counts.get(null) ?? 0 },
+                  ...operatorLayers(client.entities.values()).map((l) => ({
+                    key: operatorLayerKey(l.entity_id),
+                    title: l.aliases?.name ?? l.entity_id,
+                    icon: Layers,
+                    count: () => counts.get(l.entity_id) ?? 0,
+                    layerId: l.entity_id,
+                  })),
+                ],
+          ),
+        },
+  );
+  const sections = withOperatorLayers.map((sec) => ({
     ...sec,
     rows: sec.rows.filter((r) => !query || r.title.toLowerCase().includes(query) || sec.title.toLowerCase().includes(query)),
   })).filter((sec) => sec.rows.length);
@@ -136,19 +170,41 @@ export function LayerList({ derived }: { derived: Derived }) {
         >
           {sections.map((sec) => (
             <TreeViewItem
-              key={sec.key}
+              // Sections start collapsed, so their checkboxes come first; filtering opens them.
+              key={query ? `${sec.key}:q` : sec.key}
               title={sec.title}
               value={sec.key}
-              defaultIsExpanded={sec.key !== 'display' || !!query}
+              defaultIsExpanded={!!query}
               trailing={sec.chip ? <Badge size="Small" color="Neutral" emphasis="Subtle" label={sec.chip} /> : undefined}
             >
               {sec.rows.map((r) => (
-                <TreeViewItem key={r.key} title={r.title} value={r.key} leading={<r.icon size={12} />} trailing={<RowTrailing row={r} derived={derived} />} />
+                <TreeViewItem
+                  key={r.key}
+                  title={r.title}
+                  value={r.key}
+                  leading={<r.icon size={12} />}
+                  trailing={<RowTrailing row={r} derived={derived} />}
+                  {...(r.layerId
+                    ? {
+                        actions: (
+                          <Tooltip content="Layer details">
+                            <IconButton icon={Ellipsis} size="Small" isHighlighted accessibilityLabel={`${r.title} details`} onClick={() => setDialog({ open: true, id: r.layerId! })} />
+                          </Tooltip>
+                        ),
+                      }
+                    : {})}
+                />
               ))}
             </TreeViewItem>
           ))}
         </TreeView>
       </ScrollArea>
+      <div className="bs-insp__foot">
+        <Button size="sm" variant="secondary" tone="neutral" isFullWidth leadingIcon={<Plus size={14} />} onClick={() => setDialog({ open: true, id: null })}>
+          New layer
+        </Button>
+      </div>
+      <LayerEntryModal isOpen={dialog.open} layerId={dialog.id} onClose={() => setDialog({ open: false, id: null })} />
     </>
   );
 }
@@ -156,7 +212,8 @@ export function LayerList({ derived }: { derived: Derived }) {
 function RowTrailing({ row, derived }: { row: Row; derived: Derived }) {
   const stat: LayerStat | undefined = row.stat ? derived.byKey[row.stat] : undefined;
   const count = row.count ? row.count(derived) : stat?.count;
-  const showAge = row.age && stat && stat.count > 0 && Number.isFinite(stat.newestAge);
+  // Age shows only when it matters: aging, stale or disconnected. Current data carries none.
+  const showAge = row.age && stat && stat.count > 0 && Number.isFinite(stat.newestAge) && stat.newestState !== 'current';
   if (count === undefined && !showAge) return null;
   return (
     <>

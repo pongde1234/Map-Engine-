@@ -1,21 +1,13 @@
 /**
- * AppShell `actions` (bare icon controls in the top bar): search (Modal + SearchInput + ActionList)
- * and the view-profile switcher (DropdownMenu). Ctrl/Cmd+K opens search.
+ * Search (Modal + SearchInput + ActionList), opened with Ctrl/Cmd+K. The top bar carries no
+ * search or profile icon; the view profile is set with ?role= in the URL.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { ActionList, ActionListItem, ActionListItemIcon, DropdownMenu, DropdownMenuOverlay, DropdownMenuTrigger, IconButton, Modal, ModalBody, ModalHeader, SearchInput, Tooltip } from '@faclon-labs/fds';
-import { Crosshair, LocateFixed, Search, UserRoundCog } from 'lucide-react';
+import { ActionList, ActionListItem, ActionListItemIcon, Modal, ModalBody, ModalHeader, SearchInput } from '@faclon-labs/fds';
+import { Crosshair, LocateFixed } from 'lucide-react';
 import { CLASSES, type Entity } from '@me/schema';
 import { formatMgrs, parseMgrs } from '@me/geo';
 import { useClient, useEngine, useViewStore } from '@me/map-react';
-
-const ROLES: Array<{ id: string; label: string; detail: string }> = [
-  { id: 'planning', label: 'Planning staff', detail: 'Joint Staff West' },
-  { id: 'l1', label: 'National level', detail: 'L1 · national releasability' },
-  { id: 'l2', label: 'Joint HQ West', detail: 'L2 · joint picture' },
-  { id: 'l3', label: 'AD Direction Centre', detail: 'L3 · joint + plant' },
-  { id: 'ril', label: 'RIL control room', detail: 'L4 · plant view only' },
-];
 
 interface Hit {
   value: string;
@@ -73,21 +65,6 @@ export function ShellActions() {
 
   return (
     <>
-      <Tooltip content="Search objects, units, MGRS (Ctrl+K)">
-        <IconButton icon={Search} accessibilityLabel="Search objects, units, MGRS" onClick={() => setOpen(true)} />
-      </Tooltip>
-      <DropdownMenu>
-        <DropdownMenuTrigger>
-          <IconButton icon={UserRoundCog} accessibilityLabel={`View profile: ${client.identity?.display ?? ''}`} onClick={() => {}} />
-        </DropdownMenuTrigger>
-        <DropdownMenuOverlay placement="bottom-end">
-          <ActionList accessibilityLabel="View profile">
-            {ROLES.map((r) => (
-              <ActionListItem key={r.id} value={r.id} title={r.label} description={r.detail} isSelected={client.identity?.role === r.id} onClick={() => client.setRole(r.id)} />
-            ))}
-          </ActionList>
-        </DropdownMenuOverlay>
-      </DropdownMenu>
       <Modal isOpen={open} onDismiss={() => setOpen(false)} size="md" accessibilityLabel="Search">
         <ModalHeader title="Search" subtitle="Objects, units or an MGRS reference" />
         <ModalBody>

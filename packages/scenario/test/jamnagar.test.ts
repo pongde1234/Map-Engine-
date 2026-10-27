@@ -78,6 +78,52 @@ describe('jamnagar scenario (seed 7)', () => {
     expect(rules.some((r) => r.payload.rule === 'civil_in_engagement_area')).toBe(true);
   });
 
+  it('ranks the plant units and trips the interlocks with the protective action (DP-8)', () => {
+    const h = manifest.clock.h;
+    const units = (t: number) => [...engine.asOf(t).entities.values()].filter((e) => e.plant);
+    const before = units(h - 13 * MINUTE);
+    expect(before.map((e) => e.plant!.rank).sort()).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(before.every((e) => e.plant!.state === 'running' && e.plant!.interlock === 'armed')).toBe(true);
+    const after = new Map(units(h - 6 * MINUTE).map((e) => [e.entity_id, e.plant!]));
+    expect(after.get('PU-CDU')).toMatchObject({ rank: 1, state: 'depressurised', interlock: 'tripped' });
+    expect(after.get('PU-FCC')).toMatchObject({ rank: 2, state: 'feed_isolated', interlock: 'tripped' });
+    expect(after.get('PU-HCU')).toMatchObject({ rank: 3, state: 'running', interlock: 'armed' });
+    // Both trips are consequences of the DP-8 record; the interlock stays tripped into the restart review.
+    const dp8 = engine.eventsBetween(manifest.t0, manifest.t1).find((r) => r.kind === 'decision' && (r.payload as { dp: string }).dp === 'DP-8')!;
+    const tripped = engine.lineage.consequences(engine.journal, dp8.record_id).filter((r) => (r.payload as { plant?: { interlock?: string } }).plant?.interlock === 'tripped');
+    expect(tripped.map((r) => r.entity_id).sort()).toEqual(['PU-CDU', 'PU-FCC']);
+    expect(units(h + 55 * MINUTE).find((e) => e.entity_id === 'PU-CDU')!.plant).toMatchObject({ rank: 1, state: 'restart_assessment', interlock: 'tripped' });
+  });
+
+  it('keeps the rehearsal fixture outside the raid timeline: two disagreeing radar reports, one assessment from both', () => {
+    const th = manifest.threads.rehearsal!;
+    const recs = engine.lineage.trace(engine.journal, th);
+    const reports = recs.filter((r) => r.kind === 'observation');
+    const assessment = recs.find((r) => r.kind === 'fused')!;
+    expect(reports).toHaveLength(2);
+    expect(recs.every((r) => r.label === 'SYNTHETIC//REHEARSAL' && r.ingest_time < manifest.t0)).toBe(true);
+    // The radars disagree, and the assessment keeps both hypotheses and both reports.
+    const classes = reports.map((r) => (r.payload as { ontology: { class: string } }).ontology.class).sort();
+    expect(classes).toEqual(['civil_air', 'owa_drone']);
+    expect(assessment.derived_from!.sort()).toEqual(reports.map((r) => r.record_id).sort());
+    expect((assessment.payload as { classification: { contested: boolean; hypotheses: unknown[] } }).classification).toMatchObject({ contested: true });
+    // Never in the picture or on the map at any raid time.
+    for (const t of [manifest.t0, manifest.clock.h, manifest.t1]) expect(engine.asOf(t).get('REH-1')).toBeUndefined();
+  });
+
+  it('links the phase-0 preparation records: floors from DP-0, fire units protect the VA/VP, units are members of it', () => {
+    const pic = engine.asOf(manifest.t0 + 10 * MINUTE);
+    const fireUnits = [...pic.entities.values()].filter((e) => e.ontology?.template === 'effector');
+    expect(fireUnits.length).toBeGreaterThan(10);
+    expect(fireUnits.every((e) => e.relationships?.some((r) => r.type === 'protects' && r.target === 'VP-RIL'))).toBe(true);
+    const units = [...pic.entities.values()].filter((e) => e.plant);
+    expect(units.every((e) => e.relationships?.some((r) => r.type === 'member_of' && r.target === 'VP-RIL'))).toBe(true);
+    const dp0 = engine.eventsBetween(manifest.t0, manifest.t1).find((r) => r.kind === 'decision' && (r.payload as { dp: string }).dp === 'DP-0')!;
+    const floors = engine.lineage.consequences(engine.journal, dp0.record_id).filter((r) => r.kind === 'fused');
+    expect(floors.length).toBeGreaterThan(5);
+    expect(floors.every((r) => (r.payload as { effector?: { magazine?: { floor: number } } }).effector?.magazine?.floor !== undefined)).toBe(true);
+  });
+
   it('traces an engaged track back to the D-3 fragments', () => {
     const kill = engine.eventsBetween(manifest.t0, manifest.t1).find((r) => r.kind === 'engagement' && (r.payload as { result: string }).result === 'kill')!;
     const target = (kill.payload as { target_id: string }).target_id;

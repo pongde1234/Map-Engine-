@@ -14,6 +14,11 @@
   min-height: 0;
   min-width: 0;
 }
+/* Every side panel (left and right, on every view) is one width: 368px from the spacing scale, wide
+   enough for the five inspector tabs on one line inside the 12px inset. */
+:root {
+  --bs-panel-w: calc(var(--spacing-64) * 5.5 + var(--spacing-16));
+}
 .bs-left,
 .bs-right {
   display: flex;
@@ -24,21 +29,21 @@
   border-color: var(--border-neutral-default);
   border-style: solid;
   border-width: 0;
+  /* The same surface as the assistant panel, so the side panels and Bruce read as one family. */
+  background: var(--background-surface-intense);
 }
 /* Each region keeps its own track, so closing a side panel leaves the map in the 1fr column
    instead of shifting the inspector into it. */
 .bs-left {
   grid-column: 1;
   grid-row: 1;
-  /* 256px from the spacing scale */
-  width: calc(var(--spacing-64) * 4);
+  width: var(--bs-panel-w);
   border-right-width: var(--border-width-thin);
 }
 .bs-right {
   grid-column: 3;
   grid-row: 1;
-  /* 360px from the spacing scale: the five inspector tabs fit on one line with room to spare. */
-  width: calc(var(--spacing-64) * 5.5 + var(--spacing-8));
+  width: var(--bs-panel-w);
   border-left-width: var(--border-width-thin);
 }
 .bs-center {
@@ -70,12 +75,21 @@
   min-height: 0;
 }
 /* The strip's inset comes from a wrapper, never from the Tabs' own parts. */
+/* Side panels share one scale: 12px inset on every side, 12px between components. */
+/*
+ * Dividers: one line, one owner. The panel's own edge faces the map; the tab strip owns the line
+ * between a panel's head and what follows; a toolbar owns the line under it; a section owns the
+ * line above it (when a section comes before it); the footer owns the line above it. Inside a
+ * section there are none: spacing does that.
+ */
+/* The tab strip sits on the same 12px inset as the content under it, and owns the line below the head. */
 .bs-tabbar {
   flex: none;
-  padding: var(--spacing-8) var(--spacing-8) 0;
+  padding: var(--spacing-12);
+  border-bottom: var(--border-width-thin) solid var(--border-neutral-default);
 }
 .bs-tabbar--insp {
-  padding: 0 var(--spacing-4);
+  padding: 0 var(--spacing-12) var(--spacing-12);
 }
 .bs-left__tabpanel:not([hidden]) {
   display: flex;
@@ -83,56 +97,128 @@
   flex: 1 1 auto;
   min-height: 0;
 }
-/* Fire units: one block per defence layer, meters side by side. */
+/* Fire units: one grid row per defence layer, its units listed beneath it when open. */
 .bs-fl {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-6);
-  padding-top: var(--spacing-8);
-  min-width: 0;
-}
-.bs-fl + .bs-fl {
-  border-top: var(--border-width-thin) solid var(--border-neutral-default);
-}
-.bs-fl__head {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-6);
-  min-width: 0;
-}
-.bs-fl__tags {
-  display: flex;
   gap: var(--spacing-4);
-  flex-shrink: 0;
-  margin-left: auto;
-}
-.bs-fl__meters {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--spacing-12);
   min-width: 0;
 }
-
-/* Active-tool bar on the map: one row, wrapping on a narrow map. */
-.bs-drawbar,
-.bs-drawbar__actions {
-  display: flex;
+.bs-fu {
+  display: grid;
+  grid-template-columns: var(--spacing-24) minmax(0, 1fr) calc(var(--spacing-64) + var(--spacing-8)) calc(var(--spacing-64) + var(--spacing-8));
   align-items: center;
-  flex-wrap: wrap;
   gap: var(--spacing-8);
   min-width: 0;
 }
-.bs-drawbar__actions {
+.bs-fu--head {
+  margin-bottom: calc(var(--spacing-4) * -1);
+}
+.bs-fl {
+  padding-block: var(--spacing-4);
+}
+.bs-fu__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-4) var(--spacing-6);
+  min-width: 0;
+}
+.bs-fu__meter {
+  display: flex;
+  flex-direction: column;
   gap: var(--spacing-4);
+  min-width: 0;
+}
+
+/* Hostile tracks per ring: four cells, outer to inner. */
+.bs-rings {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--spacing-8);
+}
+.bs-rings__item {
+  min-width: 0;
+  border-radius: var(--radius-m);
+}
+.bs-rings__item:focus-visible {
+  outline: var(--border-width-thick) solid var(--border-focused);
+  outline-offset: var(--spacing-2);
+}
+.bs-rings__cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  padding: var(--spacing-8);
+  min-width: 0;
+}
+.bs-rings__name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-4);
+}
+.bs-rings__value {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-2);
+}
+/* Fire units' totals: two Cards, same anatomy as a ring. */
+.bs-fu__total {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-8);
+}
+.bs-fu__tcell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  padding: var(--spacing-8) var(--spacing-12);
+  min-width: 0;
+}
+/* The end of a list row: a figure, its meter or limit, then the count. */
+.bs-rg__end {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacing-8);
+}
+.bs-rg__end .ds-progress-bar {
+  flex: none;
+  width: var(--spacing-48);
+  min-width: var(--spacing-48);
+}
+.bs-rg__sfx {
+  margin-left: var(--spacing-6);
+}
+
+/* A finished sketch's popover points at this spot on the map (the top of the shape). */
+.bs-sketch-anchor {
+  position: absolute;
+  width: 0;
+  height: 0;
+  z-index: 2;
+}
+.bs-sketch-anchor__target {
+  position: absolute;
+  left: calc(var(--spacing-4) * -1);
+  top: calc(var(--spacing-4) * -1);
+  width: var(--spacing-8);
+  height: var(--spacing-8);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  opacity: 0;
 }
 
 /* Alerts filter row: severity and type dropdowns, match count at the end. */
 .bs-feedbar {
   display: flex;
   align-items: center;
-  gap: var(--spacing-6);
-  padding: var(--spacing-8);
+  gap: var(--spacing-8);
+  padding: var(--spacing-12);
   min-width: 0;
+  border-bottom: var(--border-width-thin) solid var(--border-neutral-default);
 }
 /* A severity tag keeps its full word; the title beside it ellipsises instead. */
 .bs-tag.bs-tag {
@@ -147,19 +233,17 @@
 .bs-facts {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-6);
-  padding: var(--spacing-8) var(--spacing-12);
+  gap: var(--spacing-8);
+  padding: var(--spacing-12);
 }
 .bs-facts--flush {
   padding: 0;
 }
-.bs-facts + .bs-facts {
-  border-top: var(--border-width-thin) solid var(--border-neutral-default);
-}
+
 .bs-facts__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--spacing-8) var(--spacing-12);
+  gap: var(--spacing-12);
   margin: 0;
 }
 .bs-fact {
@@ -188,7 +272,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-8);
-  padding: 0 var(--spacing-12);
+  padding: var(--spacing-12);
   min-width: 0;
 }
 
@@ -222,9 +306,32 @@
 .bs-hud--tl {
   top: var(--spacing-8);
   left: var(--spacing-8);
-  /* Clear of the top-right toolbar (four button groups, 352px). */
-  right: calc(var(--spacing-64) * 5.5);
+  /* Clear of the top-right toolbar (two menus). */
+  right: calc(var(--spacing-64) * 3);
   align-items: flex-start;
+}
+/* A frame's caption: bottom centre, above the row that holds the cursor readout and the scale. */
+.bs-hud--bc {
+  bottom: var(--spacing-48);
+  left: 50%;
+  max-width: calc(100% - var(--spacing-32));
+  transform: translateX(-50%);
+  align-items: center;
+}
+.bs-caption {
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+.bs-caption > * {
+  pointer-events: none;
+}
+.bs-caption[data-shown='true'] {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bs-caption {
+    transition: none;
+  }
 }
 .bs-hud--tr {
   top: var(--spacing-8);
@@ -242,18 +349,6 @@
   align-items: center;
   gap: var(--spacing-6);
 }
-.bs-legend {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-4);
-}
-.bs-legend__row {
-  display: grid;
-  grid-template-columns: calc(var(--spacing-64) + var(--spacing-8)) minmax(0, 1fr);
-  align-items: center;
-  gap: var(--spacing-8);
-}
-
 /* ---------- inspector ---------- */
 .bs-insp {
   display: flex;
@@ -264,8 +359,8 @@
 .bs-insp__head {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-6);
-  padding: var(--spacing-8) var(--spacing-12);
+  gap: var(--spacing-8);
+  padding: var(--spacing-12);
 }
 .bs-insp__caption,
 .bs-insp__sechead {
@@ -286,11 +381,12 @@
   flex-wrap: wrap;
   gap: var(--spacing-4);
 }
+/* The footer is its own band: a stroke above it, so the actions read apart from the content. */
 .bs-insp__foot {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-6);
-  padding: var(--spacing-8) var(--spacing-12);
+  padding: var(--spacing-12);
   border-top: var(--border-width-thin) solid var(--border-neutral-default);
 }
 .bs-insp__footbtns {
@@ -312,30 +408,81 @@
 }
 
 /* ---------- timeline ---------- */
-/* Transport and lanes share a row where the map is wide, and stack where it is not. */
+/* One control strip, then the ruler and the event row at full width. */
+/* Room to breathe: 12px between the strip and the ruler, 16px at the sides. */
 .bs-tl {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--spacing-4) var(--spacing-16);
-  padding: var(--spacing-6) var(--spacing-12) var(--spacing-6);
+  flex-direction: column;
+  gap: var(--spacing-12);
+  padding: var(--spacing-12) var(--spacing-16) var(--spacing-16);
   min-width: 0;
 }
-.bs-tl__transport {
-  flex: 0 1 auto;
+.bs-tl__bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--spacing-6);
+  gap: var(--spacing-12);
+  min-height: var(--spacing-32);
   min-width: 0;
 }
+/* The legend: each kind's shape and count, quiet; off is dimmed. */
+.bs-tl__legend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-4);
+}
+.bs-tl__legend [aria-pressed='false'] {
+  opacity: 0.4;
+}
+/* The picture time, one line: the raid label and its Zulu time. */
+.bs-tl__readout {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--spacing-8);
+  white-space: nowrap;
+}
+/* Text for screen readers where a chip shows only its shape. */
+.bs-tl__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 .bs-tl__lanes {
-  /* 480px from the spacing scale: below that the lanes take their own row. */
-  flex: 1 1 calc(var(--spacing-64) * 7.5);
+  position: relative;
+  width: 100%;
   min-width: 0;
+  /* The lanes never scroll sideways; the hover card may rise above them. */
+  overflow-x: clip;
   cursor: crosshair;
   touch-action: none;
-  border-radius: var(--radius-s);
+  border-radius: var(--radius-m);
+}
+/* A hover card sits above the pointer, over the lanes. */
+.bs-tl__card {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  width: max-content;
+  max-width: calc(var(--spacing-64) * 4);
+}
+.bs-tl__cardbody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  min-width: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bs-tl__card {
+    animation: bs-tl-in 120ms ease-out;
+  }
+}
+@keyframes bs-tl-in {
+  from {
+    opacity: 0;
+  }
 }
 .bs-tl__lanes:focus-visible {
   outline: var(--border-width-thick) solid var(--border-focused);
@@ -353,17 +500,63 @@
 .bs-stack {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-8);
+  gap: var(--spacing-12);
 }
 .bs-stack--tight {
   gap: var(--spacing-4);
 }
+/* Sections stacked in a panel are separated by a hairline, not by empty space. */
+.bs-divided {
+  display: flex;
+  flex-direction: column;
+}
+.bs-divided > * + * {
+  border-top: var(--border-width-thin) solid var(--border-neutral-default);
+}
+/* A section: heading row, then its content (a list brings its own inset). */
+.bs-sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+  padding: var(--spacing-12);
+  min-width: 0;
+}
+.bs-sec__title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-6);
+  min-width: 0;
+}
+.bs-sec__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-8);
+  min-height: var(--spacing-24);
+}
+/* Forms: two columns of fields, full-width rows for the name, notes and the record. */
+.bs-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-12) var(--spacing-16);
+  align-items: start;
+}
+.bs-form__wide {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+@media (max-width: 520px) {
+  .bs-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .bs-pad {
-  padding: var(--spacing-8) var(--spacing-12);
+  padding: var(--spacing-12);
   margin: 0;
 }
 .bs-filter {
-  padding: var(--spacing-8);
+  padding: var(--spacing-12);
+  border-bottom: var(--border-width-thin) solid var(--border-neutral-default);
 }
 .bs-fill {
   flex: 1 1 auto;

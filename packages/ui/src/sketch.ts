@@ -6,8 +6,16 @@
 import type { DrawState, SketchMeasure, SketchShape, ToolKind } from '@me/map';
 import type { GeoType, GeofenceWatch } from '@me/schema';
 import { formatArea, formatBearing, formatDistance, formatMgrs } from '@me/geo';
+import { Circle, MapPin, Pentagon, Ruler, Spline, type LucideIcon } from 'lucide-react';
 
 export const TOOL_WORD: Record<ToolKind, string> = { draw: 'Draw', measure: 'Measure', geofence: 'Geofence' };
+
+/** The icon each shape carries in the toolbar menu. */
+export const SHAPE_ICON: Record<ToolKind, Partial<Record<SketchShape, LucideIcon>>> = {
+  draw: { point: MapPin, line: Spline, polygon: Pentagon, circle: Circle },
+  measure: { line: Ruler, polygon: Pentagon, circle: Circle },
+  geofence: { polygon: Pentagon, circle: Circle },
+};
 
 export const SHAPES: Record<ToolKind, Array<{ id: SketchShape; label: string }>> = {
   draw: [
@@ -29,13 +37,6 @@ export const SHAPES: Record<ToolKind, Array<{ id: SketchShape; label: string }>>
 
 /** Shape each tool starts with. */
 export const DEFAULT_SHAPE: Record<ToolKind, SketchShape> = { draw: 'polygon', measure: 'line', geofence: 'polygon' };
-
-export const HINT: Record<SketchShape, string> = {
-  point: 'Click to place it',
-  line: 'Click the points, then Finish',
-  polygon: 'Click the corners, then Finish',
-  circle: 'Click the centre, then the edge',
-};
 
 export const TYPE_WORD: Partial<Record<GeoType, string>> = { annotation: 'Annotation', axis: 'Axis', nfz: 'No-fly zone', measure: 'Measurement', geofence: 'Geofence' };
 

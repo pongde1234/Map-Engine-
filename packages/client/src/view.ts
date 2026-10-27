@@ -11,7 +11,8 @@ export interface Bookmark {
   t: number;
   camera?: { center: [number, number]; zoom: number; pitch?: number; bearing?: number };
   layers?: Record<string, boolean>;
-  select?: string;
+  /** The frame's subject; `null` clears the selection (a page's no-selection state is the frame). */
+  select?: string | null;
   caption?: string;
   /** The console page the frame opens (default: the map). */
   page?: string;

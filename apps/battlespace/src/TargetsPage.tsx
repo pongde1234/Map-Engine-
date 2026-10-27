@@ -12,19 +12,20 @@
  * The machine recommends; the record identifies the approving authority. FDS components only;
  * the composites are layout around them.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionList,
   ActionListItem,
   ActionListItemBadge,
-  ActionListItemText,
   ActionListSection,
   Badge,
   Button,
   Card,
-  Chip,
-  ChipGroup,
   Counter,
+  DropdownMenu,
+  DropdownMenuOverlay,
+  DropdownMenuTrigger,
+  EmptyState,
   Metric,
   ProgressBar,
   ScrollArea,
@@ -34,9 +35,9 @@ import {
   TabPanel,
   Tabs,
 } from '@faclon-labs/fds';
-import { Map as MapIcon, MapPinned } from 'lucide-react';
+import { ChevronDown, ListFilter, Map as MapIcon, MapPinned } from 'lucide-react';
 import { formatZulu, type RaidClock } from '@me/schema';
-import { useClient, useClientTick, useEngineTime, useViewStore } from '@me/map-react';
+import { useClient, useClientTick, useEngineTime, useView, useViewStore } from '@me/map-react';
 import {
   Facts,
   STAGES,
@@ -57,6 +58,7 @@ import {
   type Target,
   type ThreatKind,
 } from '@me/ui';
+import { DEMO_FRAME, type Presenter } from './presenter.ts';
 
 type BadgeColor = 'Positive' | 'Notice' | 'Negative' | 'Neutral' | 'Information';
 
@@ -70,6 +72,16 @@ const KINDS: Array<{ id: ThreatKind; label: string }> = [
   { id: 'fast', label: 'Fast movers' },
   { id: 'decoy', label: 'Decoys' },
 ];
+/** Each stage's colour, on its header badge (FDS tone families). */
+const STAGE_TONE: Record<Stage, { badge: 'Neutral' | 'Information' | 'Notice' | 'Brand' | 'Positive' | 'Negative' }> = {
+  nominated: { badge: 'Neutral' },
+  identified: { badge: 'Information' },
+  prioritized: { badge: 'Notice' },
+  paired: { badge: 'Brand' },
+  approved: { badge: 'Positive' },
+  executing: { badge: 'Negative' },
+  assessed: { badge: 'Neutral' },
+};
 /** Stages whose header breaks the count down by priority. */
 const BY_PRIORITY = new Set<Stage>(['prioritized', 'paired', 'approved']);
 
@@ -117,7 +129,7 @@ function nextGate(t: Target): string {
   }
 }
 
-export function TargetsPage({ onOpenOnMap }: { onOpenOnMap: (id: string | null, highlight?: string[]) => void }) {
+export function TargetsPage({ presenter, onOpenOnMap }: { presenter: Presenter; onOpenOnMap: (id: string | null, highlight?: string[]) => void }) {
   const client = useClient();
   const view = useViewStore();
   const tick = useClientTick(500);
@@ -126,8 +138,11 @@ export function TargetsPage({ onOpenOnMap }: { onOpenOnMap: (id: string | null, 
   const [q, setQ] = useState('');
   const [axes, setAxes] = useState<string[]>([]);
   const [kinds, setKinds] = useState<string[]>([]);
-  // Opening from the map's "Nominate to board" lands on that target.
-  const [sel, setSel] = useState<string | null>(() => view.get().selected);
+  // Opening from the map's "Nominate to board" lands on that target, and so does a storyboard
+  // frame (B3, B4) stepped while the board is open; B5's frame clears it for the console.
+  const viewSel = useView((v) => v.selected);
+  const [sel, setSel] = useState<string | null>(viewSel);
+  useEffect(() => setSel(viewSel), [viewSel]);
   const s = client.scenario;
   const center = (s?.center ?? [69.86, 22.36]) as [number, number];
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -150,63 +165,98 @@ export function TargetsPage({ onOpenOnMap }: { onOpenOnMap: (id: string | null, 
     view.set({ selected: id });
   };
   const clockLabel = (ms: number) => (s ? raidLabel(ms, s.clock) : formatZulu(ms));
+  // Before the raid the board is empty, so it opens on the demo picture (frame B4, H-15) without
+  // the operator choosing one.
+  const demoFrame = presenter.bookmarks.find((b) => b.id === DEMO_FRAME);
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current || targets.length || !demoFrame) return;
+    seeded.current = true;
+    presenter.go(demoFrame);
+    // Once, on opening an empty board.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targets.length, demoFrame]);
 
   return (
     <div className="tb">
       <div className="tb__bar">
-        <Badge size="Small" color="Information" emphasis="Subtle" label={`PICTURE ${s ? raidLabel(t, s.clock) : ''} · ${formatZulu(t).slice(0, 5)}Z`} />
-        <Badge size="Small" color="Neutral" emphasis="Subtle" label={`VIEW ${board.label} · ${columns.length}/${STAGES.length} STAGES`} />
-        <ChipGroup selectionType="multiple" size="Small" accessibilityLabel="Axis" value={axes} onChange={({ values }) => setAxes(values)}>
-          <Chip value="NORTH">North axis</Chip>
-          <Chip value="WEST">West axis</Chip>
-        </ChipGroup>
-        <ChipGroup selectionType="multiple" size="Small" accessibilityLabel="Threat type" value={kinds} onChange={({ values }) => setKinds(values)}>
-          {KINDS.map((k) => (
-            <Chip key={k.id} value={k.id}>
-              {k.label}
-            </Chip>
-          ))}
-        </ChipGroup>
-        <span className="BodyXSmallRegular bs-muted bs-num">{shown.length === visible.length ? `${visible.length} targets` : `${shown.length} of ${visible.length} targets`}</span>
-        <span className="bs-fill" />
         <div className="tb__filter">
           <SearchInput accessibilityLabel="Filter targets" placeholder="Id, class, unit, token" value={q} onChange={({ value }) => setQ(value ?? '')} onClearButtonClick={() => setQ('')} size="Small" />
         </div>
+        <DropdownMenu
+          selectionType="multiple"
+          value={[...axes.map((v) => `axis:${v}`), ...kinds.map((v) => `kind:${v}`)]}
+          onChange={({ values }) => {
+            setAxes(values.filter((v) => v.startsWith('axis:')).map((v) => v.slice(5)));
+            setKinds(values.filter((v) => v.startsWith('kind:')).map((v) => v.slice(5)));
+          }}
+        >
+          <DropdownMenuTrigger>
+            <Button size="xs" variant="secondary" tone="neutral" leadingIcon={<ListFilter size={14} />} trailingIcon={<ChevronDown size={14} />} aria-label={`Filters${axes.length + kinds.length ? `, ${axes.length + kinds.length} on` : ''}`}>
+              {axes.length + kinds.length ? `Filter · ${axes.length + kinds.length}` : 'Filter'}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuOverlay placement="bottom-start">
+            <ActionList accessibilityLabel="Filters">
+              <ActionListSection title="Axis">
+                <ActionListItem value="axis:NORTH" title="North axis" />
+                <ActionListItem value="axis:WEST" title="West axis" />
+              </ActionListSection>
+              <ActionListSection title="Threat type">
+                {KINDS.map((k) => (
+                  <ActionListItem key={k.id} value={`kind:${k.id}`} title={k.label} />
+                ))}
+              </ActionListSection>
+            </ActionList>
+          </DropdownMenuOverlay>
+        </DropdownMenu>
+        <span className="bs-fill" />
+        <span className="BodyXSmallRegular bs-muted bs-num">{shown.length === visible.length ? `${visible.length} targets` : `${shown.length} of ${visible.length} targets`}</span>
+        {/* The identity's view is named only when it hides stages. */}
+        {columns.length < STAGES.length ? <Badge size="Small" color="Neutral" emphasis="Subtle" label={`VIEW ${board.label} · ${columns.length}/${STAGES.length} STAGES`} /> : null}
+        <Badge size="Small" color="Information" emphasis="Subtle" label={`PICTURE ${s ? raidLabel(t, s.clock) : formatZulu(t).slice(0, 5)}`} />
+        <Badge size="Small" color="Notice" emphasis="Subtle" label="DEMO DATA · SYNTHETIC" />
       </div>
 
       <SituationStrip sit={sit} clockLabel={clockLabel} consoleOpen={!selected} onShow={(id) => select(id)} onConsole={() => setSel(null)} />
 
-      <ScrollArea className="tb__board" viewportClassName="tb__board-viewport">
-        <div className="tb__cols">
-          {columns.map((st) => {
-            const items = shown.filter((x) => x.stage === st.id);
-            const p = (k: 'P1' | 'P2' | 'P3') => items.filter((x) => x.priority === k).length;
-            return (
-              <section key={st.id} className="tb__col" aria-label={st.label}>
-                <div className="tb__colhead">
-                  <span className="tb__coltitle">
-                    <span className="BodyXSmallSemibold">{st.label.toUpperCase()}</span>
-                    <Counter value={items.length} max={999} size="Small" color="Neutral" emphasis="Subtle" accessibilityLabel={`${items.length} targets`} />
-                  </span>
-                  <span className="tb__gate">
-                    <Badge className="bs-tag" size="Small" color="Neutral" emphasis="Subtle" label={st.gate.toUpperCase()} />
-                    <span className="BodyXSmallRegular bs-muted bs-ellipsis">{BY_PRIORITY.has(st.id) && items.length ? `P1 ${p('P1')} · P2 ${p('P2')} · P3 ${p('P3')}` : st.hint}</span>
-                  </span>
-                </div>
-                <ScrollArea className="bs-scroll" viewportClassName="bs-scroll__viewport">
-                  <div className="tb__cards">
-                    {items.slice(0, 80).map((x) => (
-                      <TargetCard key={x.id} x={x} isSelected={x.id === sel} onSelect={() => select(x.id)} />
-                    ))}
-                    {items.length > 80 ? <span className="BodyXSmallRegular bs-muted">{items.length - 80} more · filter to narrow</span> : null}
-                    {!items.length ? <span className="BodyXSmallRegular bs-muted tb__none">None at this time</span> : null}
-                  </div>
-                </ScrollArea>
-              </section>
-            );
-          })}
+      {!targets.length ? (
+        // Only for the moment the demo picture loads.
+        <div className="tb__board tb__empty">
+          <EmptyState title="Loading the demo picture" description="The board opens on synthetic demo data (H-15)." />
         </div>
-      </ScrollArea>
+      ) : (
+        <ScrollArea className="tb__board" viewportClassName="tb__board-viewport">
+          <div className="tb__cols">
+            {columns.map((st) => {
+              const items = shown.filter((x) => x.stage === st.id);
+              const p = (k: 'P1' | 'P2' | 'P3') => items.filter((x) => x.priority === k).length;
+              return (
+                <section key={st.id} className="tb__col" aria-label={st.label}>
+                  <div className="tb__colhead">
+                    <span className="tb__coltitle">
+                      <Badge size="Medium" color={STAGE_TONE[st.id].badge} emphasis="Intense" label={st.label.toUpperCase()} />
+                      <span className="BodySmallMedium bs-num" aria-label={`${items.length} targets`}>
+                        {items.length}
+                      </span>
+                    </span>
+                    <span className="BodyXSmallRegular bs-muted tb__colgate">{BY_PRIORITY.has(st.id) && items.length ? `${st.gate} · P1 ${p('P1')} · P2 ${p('P2')} · P3 ${p('P3')}` : `${st.gate} · ${st.hint}`}</span>
+                  </div>
+                  <ScrollArea className="bs-scroll" viewportClassName="bs-scroll__viewport">
+                    <div className="tb__cards">
+                      {items.slice(0, 80).map((x) => (
+                        <TargetCard key={x.id} x={x} isSelected={x.id === sel} onSelect={() => select(x.id)} />
+                      ))}
+                      {items.length > 80 ? <span className="BodyXSmallRegular bs-muted">{items.length - 80} more · filter to narrow</span> : null}
+                      {!items.length ? <span className="BodyXSmallRegular bs-muted tb__none">{shown.length < visible.length ? 'None match the filter' : 'None at this time'}</span> : null}
+                    </div>
+                  </ScrollArea>
+                </section>
+              );
+            })}
+          </div>
+        </ScrollArea>
+      )}
       <aside className="tb__detail" aria-label={selected ? 'Target details' : 'Decision record'}>
         {selected ? <TargetDetail x={selected} onOpenOnMap={onOpenOnMap} onClose={() => setSel(null)} /> : <DecisionConsole book={book} clock={s?.clock} known={new Set(visible.map((x) => x.id))} onSelect={select} />}
       </aside>
@@ -237,7 +287,7 @@ function SituationStrip({
         <div className="tb-tile">
           <div className="tb-tile__head">
             <span className="BodyXSmallSemibold">SATURATION · R3</span>
-            <Badge size="Small" color={sit.saturation.fired ? 'Negative' : satOver ? 'Notice' : 'Positive'} emphasis="Subtle" label={sit.saturation.fired ? 'RULE FIRED' : satOver ? 'OVER' : 'WITHIN'} />
+            {sit.saturation.fired || satOver ? <Badge size="Small" color={sit.saturation.fired ? 'Negative' : 'Notice'} emphasis="Subtle" label={sit.saturation.fired ? 'RULE FIRED' : 'OVER'} /> : null}
           </div>
           <ProgressBar
             type="meter"
@@ -267,7 +317,7 @@ function SituationStrip({
         <div className="tb-tile">
           <div className="tb-tile__head">
             <span className="BodyXSmallSemibold">ENGAGEMENT AUTHORITY</span>
-            <Badge size="Small" color={sit.authority.delegated ? 'Notice' : 'Positive'} emphasis="Subtle" label={sit.authority.delegated ? 'DELEGATED' : 'HELD'} />
+            {sit.authority.delegated ? <Badge size="Small" color="Notice" emphasis="Subtle" label="DELEGATED" /> : null}
           </div>
           <span className="BodySmallSemibold bs-ellipsis">{sit.authority.holder}</span>
           <span className="BodyXSmallRegular bs-muted bs-ellipsis">
@@ -281,7 +331,7 @@ function SituationStrip({
         <div className="tb-tile">
           <div className="tb-tile__head">
             <span className="BodyXSmallSemibold">MAGAZINES</span>
-            {sit.magazines.atFloor ? <Badge size="Small" color="Negative" emphasis="Subtle" label={`${sit.magazines.atFloor} AT FLOOR`} /> : <Badge size="Small" color="Positive" emphasis="Subtle" label="ABOVE FLOOR" />}
+            {sit.magazines.atFloor ? <Badge size="Small" color="Negative" emphasis="Subtle" label={`${sit.magazines.atFloor} AT FLOOR`} /> : null}
           </div>
           <ProgressBar
             type="meter"
@@ -309,6 +359,7 @@ function SituationStrip({
 
 function TargetCard({ x, isSelected, onSelect }: { x: Target; isSelected: boolean; onSelect: () => void }) {
   const active = x.stage !== 'assessed';
+  const showTags = !!(x.priority || (x.identity && x.identity !== 'hostile' && IDENTITY_COLOR[x.identity]) || x.contested || x.result);
   return (
     <Card padding={12} size="Medium" isSelected={isSelected} onClick={onSelect} accessibilityLabel={`${x.ref} ${x.title}`}>
       <div className="tb-card">
@@ -316,22 +367,27 @@ function TargetCard({ x, isSelected, onSelect }: { x: Target; isSelected: boolea
           <span className="BodyXSmallMedium bs-muted bs-num">{x.ref}</span>
           <span className="bs-row">
             {active && x.etaMin !== undefined ? <Badge size="Small" color={etaColor(x.etaMin)} emphasis="Subtle" label={`T-${minutes(x.etaMin)}`} /> : null}
-            {x.cls ? <Badge size="Small" color="Neutral" emphasis="Subtle" label={x.cls} /> : null}
           </span>
         </div>
         <span className="BodySmallSemibold tb-card__title">{x.title}</span>
+        {showTags ? (
         <div className="bs-badges">
           {x.priority ? <Badge size="Small" color={PRIORITY_COLOR[x.priority]} emphasis="Intense" label={x.priority} /> : null}
-          {x.identity && IDENTITY_COLOR[x.identity] ? <Badge size="Small" color={IDENTITY_COLOR[x.identity]!} emphasis="Subtle" label={x.identity.toUpperCase()} /> : null}
+          {/* Only what sets this target apart: the usual (hostile, gates passed, ring) is not tagged. */}
+          {x.identity && x.identity !== 'hostile' && IDENTITY_COLOR[x.identity] ? <Badge size="Small" color={IDENTITY_COLOR[x.identity]!} emphasis="Subtle" label={x.identity.toUpperCase()} /> : null}
           {x.contested ? <Badge size="Small" color="Notice" emphasis="Intense" label="CONTESTED" /> : null}
-          {x.ring && active ? <Badge size="Small" color="Information" emphasis="Subtle" label={x.ring} /> : null}
           {x.result ? <Badge size="Small" color={RESULT_COLOR[x.result] ?? 'Neutral'} emphasis="Subtle" label={x.result.toUpperCase()} /> : null}
         </div>
-        <div className="tb-card__checks" aria-label="Gates">
-          {x.gates.map((c) => (
-            <Badge key={c.id} size="Small" color={CHECK_COLOR[c.state]} emphasis="Subtle" label={`${c.code} ${CHECK_MARK[c.state]}`} />
-          ))}
-        </div>
+        ) : null}
+        {x.gates.some((c) => c.state !== 'pass') ? (
+          <div className="tb-card__checks" aria-label="Gates">
+            {x.gates
+              .filter((c) => c.state !== 'pass')
+              .map((c) => (
+                <Badge key={c.id} size="Small" color={CHECK_COLOR[c.state]} emphasis="Subtle" label={`${c.code} ${CHECK_MARK[c.state]}`} />
+              ))}
+          </div>
+        ) : null}
         <span className="BodyXSmallRegular bs-muted bs-ellipsis">{statusLine(x)}</span>
       </div>
     </Card>
@@ -411,17 +467,21 @@ function TargetDetail({ x, onOpenOnMap, onClose }: { x: Target; onOpenOnMap: (id
         <span className="HeadingSmallSemibold">{x.title}</span>
         <div className="bs-insp__chips">
           {x.priority ? <Badge size="Small" color={PRIORITY_COLOR[x.priority]} emphasis="Intense" label={x.priority} /> : null}
-          {x.identity && IDENTITY_COLOR[x.identity] ? <Badge size="Small" color={IDENTITY_COLOR[x.identity]!} emphasis="Subtle" label={x.identity.toUpperCase()} /> : null}
+          {x.identity && x.identity !== 'hostile' && IDENTITY_COLOR[x.identity] ? <Badge size="Small" color={IDENTITY_COLOR[x.identity]!} emphasis="Subtle" label={x.identity.toUpperCase()} /> : null}
           {x.contested ? <Badge size="Small" color="Notice" emphasis="Intense" label="CONTESTED" /> : null}
           {x.etaMin !== undefined && x.stage !== 'assessed' ? <Badge size="Small" color={etaColor(x.etaMin)} emphasis="Subtle" label={`IMPACT T-${minutes(x.etaMin)}`} /> : null}
           {x.token ? <Badge size="Small" color="Information" emphasis="Subtle" label={x.token.code} /> : null}
           {!x.live ? <Badge size="Small" color="Neutral" emphasis="Subtle" label="LEFT THE PICTURE" /> : null}
         </div>
-        <div className="tb-card__checks" aria-label="Gates">
-          {x.gates.map((c) => (
-            <Badge key={c.id} size="Small" color={CHECK_COLOR[c.state]} emphasis="Subtle" label={`${c.code} ${CHECK_MARK[c.state]}`} />
-          ))}
-        </div>
+        {x.gates.some((c) => c.state !== 'pass') ? (
+          <div className="tb-card__checks" aria-label="Gates">
+            {x.gates
+              .filter((c) => c.state !== 'pass')
+              .map((c) => (
+                <Badge key={c.id} size="Small" color={CHECK_COLOR[c.state]} emphasis="Subtle" label={`${c.code} ${CHECK_MARK[c.state]}`} />
+              ))}
+          </div>
+        ) : null}
       </div>
       <Tabs key={x.id} className="bs-tabs-fill" defaultValue={pairing ? 'pairing' : 'overview'} size="Small" variant="filled">
         <div className="bs-tabbar bs-tabbar--insp">
@@ -534,7 +594,7 @@ function TargetDetail({ x, onOpenOnMap, onClose }: { x: Target; onOpenOnMap: (id
               <ActionList accessibilityLabel="Journal history">
                 {[...x.history].reverse().map((r) => {
                   const sum = eventSummary(r);
-                  return <ActionListItem key={r.record_id} value={r.record_id} title={sum.title} description={sum.detail} trailing={<ActionListItemText>{raidLabel(r.ingest_time, clock)}</ActionListItemText>} />;
+                  return <ActionListItem key={r.record_id} value={r.record_id} title={sum.title} description={sum.detail ? `${raidLabel(r.ingest_time, clock)} · ${sum.detail}` : raidLabel(r.ingest_time, clock)} />;
                 })}
               </ActionList>
             ) : (
@@ -624,10 +684,9 @@ function DecisionConsole({ book, clock, known, onSelect }: { book: DecisionBook;
                         key={r.id}
                         value={r.id}
                         title={`${r.target} · ${r.effector}`}
-                        description={r.weapon}
+                        description={`${raidLabel(r.at, clock)} · ${r.weapon}`}
                         isDisabled={!known.has(r.target)}
                         titleSuffix={<ActionListItemBadge className="bs-tag" size="Small" color={RESULT_COLOR[r.result] ?? (r.result === 'launched' ? 'Information' : 'Neutral')} emphasis="Subtle" label={r.result.toUpperCase()} />}
-                        trailing={<ActionListItemText>{raidLabel(r.at, clock)}</ActionListItemText>}
                         onClick={() => onSelect(r.target)}
                       />
                     ))}
@@ -644,9 +703,8 @@ function DecisionConsole({ book, clock, known, onSelect }: { book: DecisionBook;
                     key={r.id}
                     value={r.id}
                     title={`${r.dp} · ${r.title}`}
-                    description={`${r.layer} · ${r.authority ?? r.author ?? '—'}${r.executions ? ` · ${r.executions} engaged` : ''}`}
+                    description={`${raidLabel(r.at, clock)} · ${r.layer} · ${r.authority ?? r.author ?? '—'}${r.executions ? ` · ${r.executions} engaged` : ''}`}
                     titleSuffix={<ActionListItemBadge className="bs-tag" size="Small" color={STATUS_COLOR[r.status] ?? 'Neutral'} emphasis="Subtle" label={r.status.toUpperCase()} />}
-                    trailing={<ActionListItemText>{raidLabel(r.at, clock)}</ActionListItemText>}
                   />
                 ))}
               </ActionList>

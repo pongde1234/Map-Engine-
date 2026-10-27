@@ -1,18 +1,26 @@
 /**
  * Battlespace console, FDS components only: left panel (Tabs: Layers · Alerts · Sources) · map
- * with its toolbar (annotate tools, storyboard frames, view, panels)
- * with HUD (Badges, Card, Code, ButtonGroups) and the SliderInput timeline beneath it ·
- * inspector. The columns are plain grid inside the AppShell page (AppShell guard).
+ * with one toolbar (Tools and View menus), the SYNTHETIC badge and a frame caption that fades,
+ * and the timeline beneath it · inspector. The columns are plain grid inside the AppShell page
+ * (AppShell guard).
  */
-import { useCallback, useEffect, useState } from 'react';
-import { ActionList, ActionListItem, Button, ButtonGroup, Card, Counter, DropdownMenu, DropdownMenuOverlay, DropdownMenuTrigger, TabItem, TabList, TabPanel, Tabs, Tooltip } from '@faclon-labs/fds';
-import { Bookmark as BookmarkIcon, ChevronLeft, ChevronRight, Compass, LocateFixed, Maximize, PanelLeft, PanelRight, PencilLine, Ruler, Shapes } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActionList, ActionListItem, ActionListItemIcon, ActionListItemText, ActionListSection, Button, Card, Counter, DropdownMenu, DropdownMenuOverlay, DropdownMenuTrigger, TabItem, TabList, TabPanel, Tabs } from '@faclon-labs/fds';
+import { ChevronDown, Compass, Eye, LocateFixed, Maximize, PanelLeft, PanelRight, PencilLine, Ruler, Shapes } from 'lucide-react';
+import type { Bookmark } from '@me/client';
 import { MapView, useClient, useDrawState, useEngine, useViewStore } from '@me/map-react';
-import { AgeLegend, CursorReadout, DEFAULT_SHAPE, DrawBar, EventFeed, Inspector, LayerList, PromoteModal, SourceList, StatusBadges, TimeBar, raidLabel, type Derived, type InspectorHandover } from '@me/ui';
-import type { ToolKind } from '@me/map';
+import { CursorReadout, DEFAULT_SHAPE, EventFeed, Inspector, LayerList, MeasurePopover, PromoteModal, SourceList, StatusBadges, TimeBar, ToolMenu, toolValue, type Derived, type InspectorHandover } from '@me/ui';
+import type { SketchShape, ToolKind } from '@me/map';
 import type { Presenter } from './presenter.ts';
 
 export type LeftTab = 'layers' | 'alerts' | 'sources';
+
+/** The Tools menu's trigger shows the tool in use. */
+const TOOL_ICON: Record<ToolKind, typeof PencilLine> = { draw: PencilLine, measure: Ruler, geofence: Shapes };
+/** How long a frame's caption stays on the map. */
+const CAPTION_MS = 5000;
+/** The frame whose caption has shown, kept across remounts of the view. */
+let captioned: Bookmark | undefined;
 
 export interface PanelState {
   leftOpen: boolean;
@@ -35,14 +43,50 @@ export function BattlespacePage({
   const { state: sketch } = useDrawState();
   const s = client.scenario;
 
+  // Selecting an object shows its details, even when the inspector was hidden: a new selection
+  // from anywhere (map, feed, search, a frame), or a click on the map that picks an object again.
+  const rightOpen = useRef(panels.rightOpen);
+  rightOpen.current = panels.rightOpen;
+  useEffect(() => {
+    const reveal = () => {
+      if (view.get().selected && !rightOpen.current) setPanels({ rightOpen: true });
+    };
+    let prev = view.get().selected;
+    const unsub = view.subscribe(() => {
+      const next = view.get().selected;
+      if (next !== prev) {
+        prev = next;
+        reveal();
+      }
+    });
+    // The map's own click lands first; read the selection it set once it has.
+    const onMapClick = () => window.setTimeout(reveal, 0);
+    engine?.map.on('click', onMapClick);
+    return () => {
+      unsub();
+      engine?.map.off('click', onMapClick);
+    };
+  }, [engine, view, setPanels]);
+
   // A finished drawing or geofence goes straight to the promote dialog.
   const sketchDone = sketch.done && (sketch.tool === 'draw' || sketch.tool === 'geofence');
   useEffect(() => {
     if (sketchDone) setPromoteOpen(true);
   }, [sketchDone]);
-  // The sketch is driven from the DrawBar on the map, so no panel needs to open for it.
+  // Tools start from their toolbar menus (or D/M/G with the default shape); the map says what
+  // finishes a sketch, so no bar or panel opens for it.
   const startTool = useCallback((tool: ToolKind) => engine?.tools.start(tool, DEFAULT_SHAPE[tool]), [engine]);
-  const { bookmarks, go: goBookmark, step, pending, applied } = presenter;
+  const pickShape = useCallback(
+    (tool: ToolKind, shape: SketchShape) => {
+      const t = engine?.tools;
+      if (!t) return;
+      const cur = t.get();
+      if (cur.tool === tool && !cur.done) t.setShape(shape);
+      else t.start(tool, shape);
+    },
+    [engine],
+  );
+  const { bookmarks, go: goBookmark, pending, applied } = presenter;
 
   // Frames are stepped by the console (presenter.ts); the camera applies here once the map exists.
   useEffect(() => {
@@ -73,9 +117,9 @@ export function BattlespacePage({
     return () => window.removeEventListener('keydown', onKey);
   }, [client, view, panels, setPanels, engine, startTool]);
 
-  const bm = presenter.current;
-  const bmIndex = presenter.index;
   const fullscreen = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
+  const drawing = sketch.tool && !sketch.done ? sketch.tool : null;
+  const ToolIcon = drawing ? TOOL_ICON[drawing] : PencilLine;
 
   return (
     <div className="bs-console">
@@ -117,99 +161,58 @@ export function BattlespacePage({
               ]}
             />
           ) : null}
+          <MeasurePopover hidden={promoteOpen} onKeep={() => setPromoteOpen(true)} />
           <div className="bs-hud bs-hud--tl">
-            <StatusBadges derived={derived} />
-            {sketch.tool ? (
-              <DrawBar onPromote={() => setPromoteOpen(true)} />
-            ) : bm ? (
-              <Card padding={12} size="Medium" width="fit-content" maxWidth="100%" accessibilityLabel="Storyboard frame">
-                <span className="BodySmallSemibold">{bm.id}</span> <span className="BodySmallRegular bs-muted">{bm.caption ?? bm.label}</span>
-              </Card>
-            ) : null}
+            <StatusBadges />
           </div>
           <div className="bs-hud bs-hud--tr">
             <div className="bs-row">
-              <ButtonGroup variant="Secondary" size="xs">
-                <Tooltip content="Draw an annotation, axis or no-fly zone (D)">
-                  <Button iconOnly aria-label="Draw" onClick={() => startTool('draw')}>
-                    <PencilLine size={14} />
+              <DropdownMenu
+                selectionType="single"
+                value={drawing ? [toolValue(drawing, sketch.shape)] : []}
+                onChange={({ values }) => {
+                  const [tool, shape] = (values[0] ?? '').split(':');
+                  if (tool && shape) pickShape(tool as ToolKind, shape as SketchShape);
+                }}
+              >
+                <DropdownMenuTrigger>
+                  <Button size="xs" variant={drawing ? 'primary' : 'secondary'} tone={drawing ? 'brand' : 'neutral'} leadingIcon={<ToolIcon size={14} />} trailingIcon={<ChevronDown size={14} />}>
+                    Tools
                   </Button>
-                </Tooltip>
-                <Tooltip content="Measure distance, bearing, area or range (M)">
-                  <Button iconOnly aria-label="Measure" onClick={() => startTool('measure')}>
-                    <Ruler size={14} />
+                </DropdownMenuTrigger>
+                <DropdownMenuOverlay placement="bottom-end">
+                  <ToolMenu />
+                </DropdownMenuOverlay>
+              </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger>
+                  <Button size="xs" variant="secondary" tone="neutral" leadingIcon={<Eye size={14} />} trailingIcon={<ChevronDown size={14} />}>
+                    View
                   </Button>
-                </Tooltip>
-                <Tooltip content="Geofence: alert when tracks enter or leave an area (G)">
-                  <Button iconOnly aria-label="Geofence" onClick={() => startTool('geofence')}>
-                    <Shapes size={14} />
-                  </Button>
-                </Tooltip>
-              </ButtonGroup>
-              <ButtonGroup variant="Secondary" size="xs">
-                <Tooltip content="Previous frame ([)">
-                  <Button iconOnly aria-label="Previous frame" onClick={() => step(-1)}>
-                    <ChevronLeft size={14} />
-                  </Button>
-                </Tooltip>
-                <DropdownMenu>
-                  <DropdownMenuTrigger>
-                    <Button iconOnly aria-label="Storyboard frames">
-                      <BookmarkIcon size={14} />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuOverlay placement="bottom-end">
-                    <ActionList accessibilityLabel="Storyboard frames">
-                      {bookmarks.map((b, i) => (
-                        <ActionListItem key={b.id} value={b.id} title={`${b.id} · ${b.label}`} description={s ? raidLabel(b.t, s.clock) : ''} isSelected={i === bmIndex} onClick={() => goBookmark(b)} />
-                      ))}
-                    </ActionList>
-                  </DropdownMenuOverlay>
-                </DropdownMenu>
-                <Tooltip content="Next frame (])">
-                  <Button iconOnly aria-label="Next frame" onClick={() => step(1)}>
-                    <ChevronRight size={14} />
-                  </Button>
-                </Tooltip>
-              </ButtonGroup>
-              <ButtonGroup variant="Secondary" size="xs">
-                <Tooltip content="Centre on the defended point">
-                  <Button iconOnly aria-label="Centre on the defended point" onClick={() => s && engine?.flyTo({ center: s.center, zoom: s.zoom })}>
-                    <LocateFixed size={14} />
-                  </Button>
-                </Tooltip>
-                <Tooltip content="North up, flat">
-                  <Button iconOnly aria-label="North up" onClick={() => engine?.map.easeTo({ bearing: 0, pitch: 0, duration: 600 })}>
-                    <Compass size={14} />
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Full screen">
-                  <Button iconOnly aria-label="Full screen" onClick={fullscreen}>
-                    <Maximize size={14} />
-                  </Button>
-                </Tooltip>
-              </ButtonGroup>
-              <ButtonGroup variant="Secondary" size="xs">
-                <Tooltip content={panels.leftOpen ? 'Hide layers panel (L)' : 'Show layers panel (L)'}>
-                  <Button iconOnly aria-label={panels.leftOpen ? 'Hide layers panel' : 'Show layers panel'} onClick={() => setPanels({ leftOpen: !panels.leftOpen })}>
-                    <PanelLeft size={14} />
-                  </Button>
-                </Tooltip>
-                <Tooltip content={panels.rightOpen ? 'Hide inspector (I)' : 'Show inspector (I)'}>
-                  <Button iconOnly aria-label={panels.rightOpen ? 'Hide inspector' : 'Show inspector'} onClick={() => setPanels({ rightOpen: !panels.rightOpen })}>
-                    <PanelRight size={14} />
-                  </Button>
-                </Tooltip>
-              </ButtonGroup>
+                </DropdownMenuTrigger>
+                <DropdownMenuOverlay placement="bottom-end">
+                  <ActionList accessibilityLabel="View">
+                    <ActionListSection>
+                      <ActionListItem value="centre" title="Centre on the defended point" leading={<ActionListItemIcon icon={LocateFixed} />} onClick={() => s && engine?.flyTo({ center: s.center, zoom: s.zoom })} />
+                      <ActionListItem value="north" title="North up, flat" leading={<ActionListItemIcon icon={Compass} />} onClick={() => engine?.map.easeTo({ bearing: 0, pitch: 0, duration: 600 })} />
+                      <ActionListItem value="fullscreen" title="Full screen" leading={<ActionListItemIcon icon={Maximize} />} onClick={fullscreen} />
+                    </ActionListSection>
+                    <ActionListSection>
+                      <ActionListItem value="layers" title={panels.leftOpen ? 'Hide layers panel' : 'Show layers panel'} leading={<ActionListItemIcon icon={PanelLeft} />} trailing={<ActionListItemText>L</ActionListItemText>} onClick={() => setPanels({ leftOpen: !panels.leftOpen })} />
+                      <ActionListItem value="inspector" title={panels.rightOpen ? 'Hide inspector' : 'Show inspector'} leading={<ActionListItemIcon icon={PanelRight} />} trailing={<ActionListItemText>I</ActionListItemText>} onClick={() => setPanels({ rightOpen: !panels.rightOpen })} />
+                    </ActionListSection>
+                  </ActionList>
+                </DropdownMenuOverlay>
+              </DropdownMenu>
             </div>
-            <AgeLegend />
           </div>
+          {sketch.tool ? null : <FrameCaption bm={presenter.current} pending={presenter.pending} />}
           <div className="bs-hud bs-hud--bl">
             <CursorReadout center={derived.center} />
           </div>
         </div>
         <div className="bs-time">
-          <TimeBar bookmarks={bookmarks} onBookmark={goBookmark} />
+          <TimeBar bookmarks={bookmarks} onBookmark={goBookmark} current={presenter.current?.id} />
         </div>
       </div>
 
@@ -219,6 +222,30 @@ export function BattlespacePage({
         </aside>
       ) : null}
       <PromoteModal isOpen={promoteOpen} onClose={() => setPromoteOpen(false)} />
+    </div>
+  );
+}
+
+/** A frame's caption, at the foot of the map when the frame is applied; it fades after a while. */
+function FrameCaption({ bm, pending }: { bm: Bookmark | undefined; pending: unknown }) {
+  const [shown, setShown] = useState(false);
+  // A frame applied, or applied again, shows its caption; coming back to the view does not.
+  useEffect(() => {
+    if (!bm || (bm === captioned && !pending)) return;
+    captioned = bm;
+    setShown(true);
+  }, [bm, pending]);
+  useEffect(() => {
+    if (!shown) return;
+    const id = window.setTimeout(() => setShown(false), CAPTION_MS);
+    return () => window.clearTimeout(id);
+  }, [shown]);
+  if (!bm) return null;
+  return (
+    <div className="bs-hud bs-hud--bc bs-caption" data-shown={shown} aria-hidden={!shown}>
+      <Card padding={12} size="Medium" width="fit-content" maxWidth="100%" accessibilityLabel="Storyboard frame">
+        <span className="BodySmallSemibold">{bm.id}</span> <span className="BodySmallRegular bs-muted">{bm.caption ?? bm.label}</span>
+      </Card>
     </div>
   );
 }

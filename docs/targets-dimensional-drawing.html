@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Target board · Dimensional Drawing</title>
+<style>
+/* One dimensional-drawing sheet (the dimensional-drawing skill's conventions): black on white, single light theme. No external requests. */
+:root{--paper:#ececec;--sheet:#ffffff;--ink:#111;--ink2:#444;--ink3:#7a7a7a;--fill:#f3f3f3;--fill2:#e6e6e6;--f:Arimo,'Helvetica Neue',Helvetica,Arial,sans-serif;color-scheme:light}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f)}
+.wrap{max-width:1760px;margin:0 auto;padding-block:24px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.scroll{overflow-x:auto;background:var(--sheet);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+svg{display:block;width:100%;min-width:1100px;height:auto}
+.tb{background:var(--sheet);border:1.2px solid var(--ink);border-radius:16px;overflow:hidden;display:grid;grid-template-columns:2.2fr 1fr 1fr 1fr;margin-bottom:24px}
+.tb>div{border-right:.8px solid var(--ink);border-bottom:.8px solid var(--ink);padding:10px 14px;min-width:0}
+.tb>div:nth-child(4),.tb>div:nth-child(7){border-right:0}
+.tb .big{grid-row:span 2;display:flex;flex-direction:column;justify-content:space-between;gap:12px}
+.tb h1{font-weight:400;letter-spacing:.1em;font-size:clamp(28px,4vw,44px);line-height:1;margin:4px 0 0;text-transform:uppercase}
+.lbl{text-transform:uppercase;letter-spacing:.06em;font-size:9.5px;color:var(--ink2)}
+.tb .v{font-size:13px;margin-top:2px;letter-spacing:.05em;text-transform:uppercase;font-variant-numeric:tabular-nums}
+.tb .big .v{font-size:11px;color:var(--ink2);line-height:1.6}
+.tb .notes{grid-column:1/-1;border-right:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:6px 24px;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;line-height:1.9}
+.tb .notes ol{margin:4px 0 0;padding-left:20px}
+.tb .nh{font-weight:700;font-size:13px;letter-spacing:.06em}
+.tb .nh span{font-weight:400;font-size:11.5px;margin-left:6px}
+.tb .figs{grid-column:1/-1;border-right:0;border-bottom:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px 18px}
+.tb .figs>div{border-left:.8px solid var(--ink);padding-left:14px}
+.tb .figs>div:first-child{border-left:0;padding-left:0}
+.tb .figs .v{font-size:18px;letter-spacing:.06em;text-transform:none;margin-top:4px}
+@media (max-width:640px){.tb{grid-template-columns:1fr 1fr}.tb .big{grid-column:1/-1;grid-row:auto}}
+.sheetwrap{margin-bottom:28px}
+.foot{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink2);padding:10px 2px 0}
+.foot b{font-weight:700;color:var(--ink)}
+.u{font-family:var(--f);text-transform:uppercase;letter-spacing:.07em}
+.border{fill:none;stroke:var(--ink);stroke-width:1.2}
+.obj{fill:var(--sheet);stroke:var(--ink);stroke-width:1.6;stroke-linejoin:round}
+.objt{fill:var(--sheet);stroke:var(--ink);stroke-width:1;stroke-linejoin:round}
+.well{fill:var(--fill);stroke:var(--ink);stroke-width:1}
+.slot{fill:none;stroke:var(--ink2);stroke-width:.8;stroke-dasharray:4 3}
+.hug{fill:var(--fill2);stroke:var(--ink);stroke-width:1}
+.thin{fill:none;stroke:var(--ink);stroke-width:.8}
+.ph{fill:none;stroke:var(--ink3);stroke-width:.8;stroke-dasharray:14 3 3 3}
+.cl{fill:none;stroke:var(--ink3);stroke-width:.7;stroke-dasharray:16 3 2 3}
+.dl{stroke:var(--ink);stroke-width:.7;fill:none}
+.ext{stroke:var(--ink);stroke-width:.55;fill:none}
+.arrow{fill:var(--ink)}
+.hl{stroke:var(--ink2);stroke-width:.7}
+.dt{font:400 11px var(--f);fill:var(--ink);paint-order:stroke;stroke:var(--sheet);stroke-width:4px;stroke-linejoin:round}
+.dts{font:400 9.5px var(--f);fill:var(--ink2);letter-spacing:.06em;text-transform:uppercase;paint-order:stroke;stroke:var(--sheet);stroke-width:3px}
+.sl{font:400 9px var(--f);fill:var(--ink2);letter-spacing:.08em;text-transform:uppercase}
+.nt{font:400 11.5px var(--f);fill:var(--ink);letter-spacing:.06em;text-transform:uppercase}
+.nth{font:700 13px var(--f);fill:var(--ink);letter-spacing:.06em}
+.vt{font:400 12px var(--f);fill:var(--ink);letter-spacing:.1em;text-transform:uppercase}
+.nb{fill:var(--sheet);stroke:var(--ink);stroke-width:.9}
+.nbt{font:400 9.5px var(--f);fill:var(--ink)}
+.lead{stroke:var(--ink);stroke-width:.7;fill:none}
+.dot{fill:var(--ink)}
+.th{font:400 10.5px var(--f);fill:var(--ink);letter-spacing:.05em;text-transform:uppercase}
+.tc{font:400 10.5px var(--f);fill:var(--ink)}
+.tbk{font:400 7px var(--f);fill:var(--ink2);letter-spacing:.04em;text-transform:uppercase}
+.tbt{font:700 15px var(--f);fill:var(--ink)}
+.tbv{font:400 17px var(--f);fill:var(--ink);letter-spacing:.06em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="tb">
+    <div class="big">
+      <div><div class="lbl">UI page · dimensional drawing</div><h1>Target board</h1></div>
+      <div class="v">Architecture only: slots, spacing, radii and layers. Content is out of scope.</div>
+    </div>
+    <div><div class="lbl">Dwg no.</div><div class="v">UI-BOARD-001</div></div>
+    <div><div class="lbl">Rev</div><div class="v">A</div></div>
+    <div><div class="lbl">Sheets</div><div class="v">1</div></div>
+    <div><div class="lbl">Units</div><div class="v">CSS px @ 1×</div></div>
+    <div><div class="lbl">Scale</div><div class="v">Noted per view</div></div>
+    <div><div class="lbl">Source</div><div class="v">Measured · 1920 × 1080 · light theme</div></div>
+    <div class="notes">
+      <div><span class="nh">NOTES:<span>(UNLESS OTHERWISE SPECIFIED)</span></span><ol>
+        <li>Do not scale from screen. Read the numbers.</li>
+        <li>All dimensions in CSS px at 1×, measured from the running page. Padding is inside the 1 px border.</li>
+        <li>Slots are placeholders. Text, tags and copy are not part of the drawing.</li></ol></div>
+      <div><span class="nh" aria-hidden="true">&nbsp;</span><ol start="4">
+        <li>Every dimension is a variable (S1, R2, H1…). Values and formulas are in the variable tables.</li>
+        <li>HUG = sized by its content · FLEX = takes the remaining space · FILL = full width of its parent.</li>
+        <li>[TBD] = not fixed by the page: defined by the viewport or by content.</li>
+        <li>Grayscale by design. Stage colour is a token family on the column and its header; it is out of scope here.</li></ol></div>
+    </div>
+    <div class="figs">
+      <div><div class="lbl">P1 · panel-w</div><div class="v">5.5·64 + 16 = 368</div></div>
+      <div><div class="lbl">S1 · gutter</div><div class="v">12</div></div>
+      <div><div class="lbl">S2 · gap</div><div class="v">8</div></div>
+      <div><div class="lbl">S3 · card-pad</div><div class="v">12</div></div>
+      <div><div class="lbl">H1 · bar-h</div><div class="v">2·S2 + H5 + B = 49</div></div>
+      <div><div class="lbl">R1 · r-column</div><div class="v">12</div></div>
+      <div><div class="lbl">R2 · r-card</div><div class="v">8</div></div>
+    </div>
+  </header>
+  <div class="sheetwrap"><div class="scroll"><svg id="sh1" viewBox="0 0 1700 1060" role="img" aria-label="Single sheet: plan view of the target board with variable dimensions, card and column details, layer stack, radius details and variable tables"></svg></div>
+  <div class="foot"><span>2026-10-27 &nbsp;|&nbsp; UI page reference</span><span><b>Target board, architecture</b> &nbsp;|&nbsp; 1</span></div></div>
+</div>
+
+<script>
+(function(){
+const NS='http://www.w3.org/2000/svg';let sv,A,HAT,uid=0;
+function mk(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)if(a[k]!=null)e.setAttribute(k,a[k]);(p||sv).appendChild(e);return e}
+function tx(x,y,s,c,a,p){const t=mk('text',Object.assign({x:x,y:y,class:c||'dt'},a||{}),p);t.textContent=s;return t}
+function rr(x,y,w,h,r,c){return mk('rect',{x:x,y:y,width:w,height:h,rx:r,class:c})}
+function begin(id){sv=document.getElementById(id);sv.innerHTML='';const n=uid++;const d=mk('defs',{});const m=mk('marker',{id:'ar'+n,viewBox:'0 0 10 10',refX:10,refY:5,markerWidth:7,markerHeight:7,orient:'auto-start-reverse',markerUnits:'userSpaceOnUse'},d);mk('path',{d:'M0,1.7 L10,5 L0,8.3 z',class:'arrow'},m);
+ const pt=mk('pattern',{id:'hat'+n,width:5,height:5,patternUnits:'userSpaceOnUse',patternTransform:'rotate(45)'},d);mk('line',{x1:0,y1:0,x2:0,y2:5,class:'hl'},pt);A='url(#ar'+n+')';HAT='url(#hat'+n+')';rr(20,20,1660,1020,16,'border')}
+
+/* ---- kit ---- */
+function dimH(x1,x2,y,e1,e2,l,o){o=o||{};[[x1,e1],[x2,e2]].forEach(([x,e])=>{if(e==null)return;const s=Math.sign(y-e)||1;mk('line',{x1:x,y1:e+s*3,x2:x,y2:y+s*5,class:'ext'})});
+ if(x2-x1>=28)mk('line',{x1:x1,y1:y,x2:x2,y2:y,class:'dl','marker-start':A,'marker-end':A});else{mk('line',{x1:x1-13,y1:y,x2:x1,y2:y,class:'dl','marker-end':A});mk('line',{x1:x2+13,y1:y,x2:x2,y2:y,class:'dl','marker-end':A});mk('line',{x1:x1,y1:y,x2:x2,y2:y,class:'dl'})}
+ tx((x1+x2)/2+(o.dx||0),(o.below?y+13:y-4)+(o.dy||0),l,o.c||'dt',{'text-anchor':'middle'})}
+function dimV(y1,y2,x,e1,e2,l,o){o=o||{};[[y1,e1],[y2,e2]].forEach(([y,e])=>{if(e==null)return;const s=Math.sign(x-e)||1;mk('line',{x1:e+s*3,y1:y,x2:x+s*5,y2:y,class:'ext'})});
+ if(y2-y1>=28)mk('line',{x1:x,y1:y1,x2:x,y2:y2,class:'dl','marker-start':A,'marker-end':A});else{mk('line',{x1:x,y1:y1-13,x2:x,y2:y1,class:'dl','marker-end':A});mk('line',{x1:x,y1:y2+13,x2:x,y2:y2,class:'dl','marker-end':A});mk('line',{x1:x,y1:y1,x2:x,y2:y2,class:'dl'})}
+ const c=(y1+y2)/2;if(o.side){const r=o.side==='r';tx(r?x+6:x-6,c+4,l,o.c||'dt',{'text-anchor':r?'start':'end'})}else tx(x-5,c,l,o.c||'dt',{'text-anchor':'middle',transform:'rotate(-90 '+(x-5)+' '+c+')'})}
+function callout(px,py,ex,ey,l,dir,c){const s=dir||(ex>=px?1:-1);mk('circle',{cx:px,cy:py,r:1.8,class:'dot'});mk('polyline',{points:px+','+py+' '+ex+','+ey+' '+(ex+s*10)+','+ey,class:'lead'});tx(ex+s*14,ey+4,l,c||'dt',{'text-anchor':s>0?'start':'end'})}
+function nb(x,y,n){mk('rect',{x:x-6,y:y-6,width:12,height:12,class:'nb'});tx(x,y+3.5,String(n),'nbt',{'text-anchor':'middle'})}
+function title(x,y,t,s){tx(x,y,t,'vt',{'text-anchor':'middle'});if(s)tx(x,y+14,s,'dts',{'text-anchor':'middle'})}
+function notes(list){const NX=50,NY=58;tx(NX,NY,'NOTES:','nth');tx(NX+62,NY,'(UNLESS OTHERWISE SPECIFIED)','nt');
+ list.forEach(([n,t],i)=>{const y=NY+30+i*24;if(n){nb(NX+6,y-4,n);tx(NX+22,y,t,'nt')}else tx(NX,y,t,'nt')})}
+function table(x,y,ttl,rows){const ws=[40,88,96],rh=17;tx(x,y-8,ttl,'vt');
+ const all=[['Code','Variable','Value']].concat(rows);all.forEach((r,i)=>{let cx2=x;r.forEach((c,j)=>{mk('rect',{x:cx2,y:y+i*rh,width:ws[j],height:rh,class:'thin'});tx(cx2+(j?ws[j]/2:6),y+i*rh+12,c,i?'tc':'th',{'text-anchor':j?'middle':'start'});cx2+=ws[j]})});return y+all.length*rh+36}
+function detailRef(cx,cy,r,lbl,lx,ly){mk('circle',{cx:cx,cy:cy,r:r,class:'ph'});const a=Math.atan2(ly-cy,lx-cx);mk('line',{x1:cx+r*Math.cos(a),y1:cy+r*Math.sin(a),x2:lx,y2:ly,class:'lead'});tx(lx+(lx<cx?-4:4),ly+4,lbl,'dts',{'text-anchor':lx<cx?'end':'start'})}
+function slot(x,y,w,h,l,al,c){rr(x,y,w,h,3,c||'slot');if(l)tx(al==='l'?x+6:x+w/2,y+h/2+3.2,l,'sl',{'text-anchor':al==='l'?'start':'middle'})}
+
+begin('sh1');
+/* ---------- notes ---------- */
+notes([[1,'PAGE = BAR + STRIP + BOARD | PANEL'],[2,'COLUMNS ARE EQUAL: FLEX, MIN C'],[3,'CARD ROWS 3, 4 OMITTED IF EMPTY'],[4,'COLUMN TINT = STAGE TONE'],[5,'BOARD SCROLLS SIDEWAYS'],[0,'SEE DETAILS A, B, C, D']]);
+
+/* ---------- plan view: page at 0.42 ---------- */
+const k=.42,ox=470,oy=128,X=v=>ox+v*k,Y=v=>oy+v*k;
+title(X(929),oy-62,'PLAN VIEW · TARGET BOARD','SCALE 0.42:1 · VIEWPORT 1920 × 1080 · CONTENT 1858 × 990');
+rr(ox,oy,1858*k,990*k,6,'obj');
+/* bar */
+rr(ox,oy,1858*k,49*k,0,'well');slot(X(12),Y(8),150*k,33*k,'',null);slot(X(1858-12-300),Y(8),300*k,33*k,'',null);
+tx(X(180),Y(29)+3,'BAR · BADGE SLOTS · FILTER SLOTS','sl');tx(X(1858-162),Y(29)+3,'SEARCH','sl',{'text-anchor':'middle'});
+/* strip */
+for(let i=0;i<5;i++){const x=12+i*(287+8);rr(X(x),Y(61),287*k,94*k,3,'objt');slot(X(x+12),Y(73),120*k,12*k,'',null)}
+tx(X(745),Y(150),'STRIP · 5 EQUAL TILES','sl',{'text-anchor':'middle'});
+/* board */
+rr(X(0),Y(155),1490*k,835*k,0,'thin');
+for(let i=0;i<7;i++){const x=12+i*(203+8);rr(X(x),Y(167),203*k,811*k,5,i%2?'well':'hug');rr(X(x),Y(167),203*k,52*k,5,'objt');
+  [0,1,2].slice(0,i<4?3:i<6?2:1).forEach(j=>rr(X(x+12),Y(167+52+8+j*156),179*k,148*k,3,'objt'))}
+/* panel */
+rr(X(1490),Y(49),368*k,941*k,0,'well');
+rr(X(1490+12),Y(49+12),344*k,28*k,3,'hug');tx(X(1490+184),Y(49+12+14)+3,'TAB STRIP','sl',{'text-anchor':'middle'});
+rr(X(1490+12),Y(49+60),344*k,60*k,3,'objt');rr(X(1490+12),Y(49+136),344*k,60*k,3,'objt');rr(X(1490+12),Y(49+212),344*k,60*k,3,'objt');
+tx(X(1490+184),Y(49+420),'CONTENT · FILL','sl',{'text-anchor':'middle'});
+mk('line',{x1:X(1490),y1:Y(990-77),x2:X(1858),y2:Y(990-77),class:'thin'});slot(X(1490+12),Y(990-77+12),344*k,32*k,'ACTION',null);
+
+/* dims: top */
+dimH(X(0),X(1490),oy-14,oy,oy,'BOARD · FILL = W − P1');dimH(X(1490),X(1858),oy-14,oy,oy,'P1 = 368');
+/* left chain */
+dimV(Y(0),Y(49),ox-14,ox,ox,'H1 = 49');dimV(Y(49),Y(155),ox-14,ox,ox,'H2 = 106');dimV(Y(155),Y(990),ox-14,ox,ox,'FILL');
+dimV(Y(0),Y(990),ox-44,ox,ox,'990 (REF)');
+/* gutters, below the board */
+const gy=oy+990*k+22;
+dimH(X(0),X(12),gy,Y(978),Y(978),'S1',{dx:-14,dy:-3});dimH(X(215),X(223),gy,Y(978),Y(978),'S2',{below:true,dy:3});
+tx(X(745),gy+3,'BOARD · 7 COLUMNS · FLEX','sl',{'text-anchor':'middle'});
+/* right chain (panel) */
+const rx=X(1858)+14;
+dimV(Y(61),Y(89),rx,X(1858),X(1858),'H6 = 28',{side:'r'});
+dimV(Y(990-77),Y(990),rx,X(1858),X(1858),'H7 = 77',{side:'r'});
+/* detail circles: letters */
+function dref(cx,cy,r,l,dx,dy){mk('circle',{cx:cx,cy:cy,r:r,class:'ph'});const lx=cx+dx,ly=cy+dy;mk('line',{x1:cx+r*Math.cos(Math.atan2(dy,dx)),y1:cy+r*Math.sin(Math.atan2(dy,dx)),x2:lx,y2:ly,class:'lead'});mk('circle',{cx:lx,cy:ly,r:9,class:'nb'});tx(lx,ly+3.6,l,'nbt',{'text-anchor':'middle'})}
+dref(X(12+101),Y(167+52+8+74),26,'A',-38,-34);dref(X(12+101),Y(167+26),26,'B',34,-32);
+/* note numbers */
+nb(X(1490)-12,Y(30),1);nb(X(12+101),Y(167+560),2);nb(X(12+101+100),Y(167+52+8+148+4),3);nb(X(223+101),Y(167+720),4);nb(X(1400),Y(975),5);
+
+/* ---------- Detail A · card at 1.5 ---------- */
+(function(){const s=1.5,x0=70,y0=690;
+ title(x0+(179*s)/2,y0-34,'DETAIL A · TARGET CARD','SCALE 1.5:1');
+ const w=179*s,h=148*s;rr(x0,y0,w,h,8*s,'obj');
+ const p=12*s,g=6*s,ix=x0+p,iw=w-2*p;let y=y0+p;
+ slot(ix,y,60*s,16*s,'REF · HUG','l');slot(ix+iw-70*s,y,70*s,16*s,'TAGS · HUG','l');const yHead=y;y+=16*s+g;
+ slot(ix,y,iw,36*s,'TITLE SLOT · FILL · 2 LINES','l');const yTitle=y;y+=36*s+g;
+ slot(ix,y,iw,16*s,'TAG SLOTS · HUG · WRAPS','l');const yTags=y;y+=16*s+g;
+ slot(ix,y,iw,16*s,'GATE SLOTS · HUG','l');const yGate=y;y+=16*s+g;
+ slot(ix,y,iw,14*s,'STATUS SLOT · FILL · ELLIPSIS','l');const yStat=y;
+ nb(x0-14,yTags+8,3);nb(x0-14,yGate+8,3);
+ const dx=x0+w+22,R={side:'r'};
+ dimV(y0,y0+p,dx,x0+w,x0+w,'S3',R);dimV(yHead,yHead+16*s,dx,x0+w,x0+w,'H8 = 16',R);dimV(yHead+16*s,yTitle,dx,x0+w,x0+w,'S4',R);
+ dimV(yTitle,yTitle+36*s,dx,x0+w,x0+w,'H9 = 36',R);dimV(yTitle+36*s,yTags,dx,x0+w,x0+w,'S4',R);
+ dimV(yTags,yTags+16*s,dx,x0+w,x0+w,'H8',R);dimV(yTags+16*s,yGate,dx,x0+w,x0+w,'S4',R);dimV(yGate,yGate+16*s,dx,x0+w,x0+w,'H8',R);
+ dimV(yGate+16*s,yStat,dx,x0+w,x0+w,'S4',R);dimV(yStat,yStat+14*s,dx,x0+w,x0+w,'H10 = 14',R);dimV(yStat+14*s,y0+h,dx,x0+w,x0+w,'S3',R);
+ dimH(x0,x0+p,y0+h+18,y0+h,y0+h,'S3',{below:true,dy:-2});dimH(x0,x0+w,y0+h+42,y0+h,y0+h,'W = FILL (COLUMN − 2·S1 = 179)',{below:true,dy:-2});
+ callout(x0+w-4,y0+14,x0+w-4,y0-14,'R2 · B',1);
+})();
+
+/* ---------- Detail B · column at 1.1 ---------- */
+(function(){const s=1.1,x0=560,y0=690;
+ title(x0+(203*s)/2,y0-34,'DETAIL B · COLUMN','SCALE 1.1:1');
+ const w=203*s,h=232*s;rr(x0,y0,w,h,12*s,'hug');
+ rr(x0,y0,w,52*s,12*s,'objt');
+ slot(x0+12*s,y0+12*s,90*s,20*s,'BADGE · HUG','l');slot(x0+12*s+98*s,y0+14*s,22*s,16*s,'N','l');
+ slot(x0+12*s,y0+36*s,179*s,12*s,'GATE · HINT · FILL · ELLIPSIS','l');
+ rr(x0+12*s,y0+60*s,179*s,92,8*s,'obj');slot(x0+24*s,y0+72*s,155*s,24,'CARD · DETAIL A','l');
+ const dx=x0+w+22,R={side:'r'};
+ dimV(y0,y0+12*s,dx,x0+w,x0+w,'S1',R);dimV(y0+12*s,y0+32*s,dx,x0+w,x0+w,'H11 = 20',R);
+ dimV(y0+48*s,y0+52*s,dx,x0+w,x0+w,'S5 = 4',R);dimV(y0+52*s,y0+60*s,dx,x0+w,x0+w,'S2',R);
+ dimV(y0,y0+52*s,x0-18,y0,y0,'H12 = 52');
+ dimH(x0,x0+12*s,y0+h+18,y0+h,y0+h,'S1',{below:true,dy:-2});dimH(x0,x0+w,y0+h+42,y0+h,y0+h,'C = FLEX · MIN 200 (203 @ 1920)',{below:true,dy:-2});
+ callout(x0+w-3,y0+h-17,x0+w+30,y0+h+10,'R1',1);
+ tx(x0+w/2,y0+h-12,'CARDS · GAP S2 · PAD S2 / S1 / S1','sl',{'text-anchor':'middle'});
+})();
+
+/* ---------- Detail C · layer stack ---------- */
+(function(){const x0=1060,y0=805;title(x0+60,656,'DETAIL C · LAYERS','EXPLODED · NOT TO SCALE');
+ const plate=(z,w,h,cls)=>{const x=x0,y=y0-z,pts=[[x,y+h*.45],[x+w*.55,y],[x+w,y+h*.45],[x+w*.45,y+h]].map(p=>p.join(',')).join(' ');return mk('polygon',{points:pts,class:cls||'objt'})};
+ [[0,170,112,'well'],[42,150,100,'hug'],[84,124,82,'objt'],[126,92,60,'slot']].forEach(([z,w,h,c])=>plate(z,w,h,c));
+ const lab=(z,l)=>{const y=y0-z+30;mk('polyline',{points:(x0+70)+','+y+' '+(x0-40)+','+y,class:'lead'});tx(x0-46,y+4,l,'dt',{'text-anchor':'end'})};
+ lab(0,'1 · PAGE · SURFACE');lab(42,'2 · COLUMN · STAGE TINT · R1');lab(84,'3 · CARD · SURFACE · B · R2');lab(126,'4 · SLOTS · TAGS · TEXT');
+})();
+
+/* ---------- Detail D · radii ---------- */
+(function(){const x0=1000,y0=972;title(x0+150,y0-36,'DETAIL D · RADII','SCALE 3:1 · R4 PILL = h ÷ 2 (TAG 16 → 8 · BADGE 20 → 10)');
+ [['R1',12,0],['R2',8,1],['R4',8,2]].forEach(([l,r,i])=>{const sc=3,cx=x0+i*130,cy=y0;const R=r*sc;
+  mk('path',{d:'M'+cx+','+(cy+R+26)+' L'+cx+','+(cy+R)+' A'+R+','+R+' 0 0 1 '+(cx+R)+','+cy+' L'+(cx+R+30)+','+cy,class:'obj',fill:'none'});
+  mk('line',{x1:cx,y1:cy+R,x2:cx+R,y2:cy+R,class:'cl'});mk('line',{x1:cx+R,y1:cy,x2:cx+R,y2:cy+R,class:'cl'});
+  callout(cx+R-R*Math.SQRT1_2,cy+R-R*Math.SQRT1_2,cx+R+8,cy+R+18,l+' = '+r,1)});
+})();
+
+/* ---------- tables ---------- */
+let ty=96;const TX=1416;
+ty=table(TX,ty,'SPACING',[['S1','gutter','12'],['S2','gap','8'],['S3','card-pad','12'],['S4','stack-gap','6'],['S5','col-head-b','4'],['S6','head-gap','2']]);
+ty=table(TX,ty,'SIZE',[['P1','panel-w','368'],['W','page-w','[TBD]'],['H1','bar-h','49'],['H2','strip-h','106'],['H3','tile-h','94'],['H5','control-h','32'],['H6','tab-strip-h','28'],['H7','footer-h','77'],['H10','status-h','14'],['H12','col-head-h','52'],['H8','tag-h','16'],['H9','title-h','36'],['H11','badge-h','20'],['C','col-w','200 min']]);
+ty=table(TX,ty,'RADIUS',[['R1','r-column','12'],['R2','r-card','8'],['R4','r-pill','h ÷ 2']]);
+ty=table(TX,ty,'BORDER',[['B','line','1']]);
+})();
+</script>
+</body>
+</html>

@@ -59,12 +59,15 @@ export const RuleFirePayload = z.object({
     'missile_appears',
     'leaker_forecast',
     'geofence',
+    'custom', // an operator's custom alert (see AlertRule)
   ]),
   state: z.enum(['fired', 'cleared']),
   value: z.number().optional(),
   threshold: z.union([z.number(), z.string()]).optional(),
   subject_ids: z.array(z.string()).default([]),
   note: z.string().optional(),
+  /** A custom alert's severity, as its author set it. */
+  severity: z.enum(['high', 'medium', 'low']).optional(),
 });
 export type RuleFirePayload = z.infer<typeof RuleFirePayload>;
 

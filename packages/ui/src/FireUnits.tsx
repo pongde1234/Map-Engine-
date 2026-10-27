@@ -1,18 +1,22 @@
 /**
  * Fire units by defence layer, outer to inner (the order a raid meets them). A composite of FDS
- * parts, in the same labelled-meter language as the ring occupancy above it:
- *   - each layer: a disclosure Button, name and unit count, tags only for exceptions
- *     (SATURATED, LOW, AT FLOOR, DOWN), then two meters — channels in use and rounds ready;
+ * parts laid out as a compact grid with its column headings written once:
+ *   - each layer is one row: a disclosure Button and its name, then two small meters with their
+ *     figures — channels in use and rounds ready. The meters' colours carry the state (amber when
+ *     every channel is busy, amber or red as the magazine nears or reaches its floor); a tag
+ *     appears only for what no meter shows: units DOWN;
  *   - opening a layer lists its units (ActionList: selecting one selects it on the map), most
- *     depleted first, each with its worst state as a tag.
+ *     depleted first, tagged only when DOWN or AT FLOOR.
  * A layer with a unit near or under its floor opens by itself; the reader's own choice wins.
+ * Above the layers, two Cards total the channels in use and the rounds ready.
  */
 import { useState, type ComponentProps } from 'react';
-import { ActionList, ActionListItem, ActionListItemBadge, Badge, Button, Counter, ProgressBar } from '@faclon-labs/fds';
+import { ActionList, ActionListItem, ActionListItemBadge, Badge, Button, Card, CardBody, Metric, ProgressBar, Tooltip } from '@faclon-labs/fds';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { Effector, Entity } from '@me/schema';
 import { useViewStore } from '@me/map-react';
 import { MAG_COLOR, magState, type MagState } from './magazine.ts';
+import { Section } from './Section.tsx';
 
 const RANK: Record<MagState, number> = { ok: 0, low: 1, floor: 2 };
 
@@ -92,25 +96,11 @@ function layersOf(effectors: Entity[]): Layer[] {
   return out;
 }
 
-/** A unit's worst state as one tag; none when it is simply ready. */
+/** A unit's tag, only for what its figures do not say: down, or at its reserve floor. */
 function unitTag(u: Unit): { color: BadgeColor; label: string } | null {
   if (u.status === 'down') return { color: 'Negative', label: 'DOWN' };
   if (u.state === 'floor') return { color: 'Negative', label: 'AT FLOOR' };
-  if (u.state === 'low') return { color: 'Notice', label: 'LOW' };
-  if (u.status === 'reloading') return { color: 'Notice', label: 'RELOADING' };
-  if (u.total > 0 && u.busy >= u.total) return { color: 'Notice', label: 'SATURATED' };
-  if (u.busy > 0) return { color: 'Information', label: 'ENGAGING' };
   return null;
-}
-
-/** A layer's exceptions as tags, most severe first; healthy layers carry none. */
-function layerTags(l: Layer): Array<{ color: BadgeColor; label: string }> {
-  const tags: Array<{ color: BadgeColor; label: string }> = [];
-  if (l.down) tags.push({ color: 'Negative', label: `${l.down} DOWN` });
-  if (l.state === 'floor') tags.push({ color: 'Negative', label: 'AT FLOOR' });
-  else if (l.state === 'low') tags.push({ color: 'Notice', label: 'LOW' });
-  if (l.total > 0 && l.busy >= l.total) tags.push({ color: 'Notice', label: 'SATURATED' });
-  return tags.slice(0, 2);
 }
 
 export function FireUnits({ effectors }: { effectors: Entity[] }) {
@@ -131,40 +121,74 @@ export function FireUnits({ effectors }: { effectors: Entity[] }) {
     setMine({ open, closed });
   };
   const units = layers.reduce((a, l) => a + l.units.length, 0);
-  const engaging = layers.reduce((a, l) => a + l.units.filter((u) => u.busy > 0).length, 0);
+  const sum = (k: 'busy' | 'total' | 'ready' | 'capacity') => layers.reduce((a, l) => a + l[k], 0);
+  const worst = layers.reduce<MagState>((w, l) => (RANK[l.state] > RANK[w] ? l.state : w), 'ok');
+  const totals: Array<{ label: string; value: number; of: number; color: ComponentProps<typeof ProgressBar>['color'] }> = [
+    { label: 'Channels busy', value: sum('busy'), of: sum('total'), color: sum('total') > 0 && sum('busy') >= sum('total') ? 'Notice' : 'Information' },
+    { label: 'Rounds ready', value: sum('ready'), of: sum('capacity'), color: MAG_COLOR[worst] },
+  ];
+  if (!layers.length) return null;
 
   return (
-    <section className="bs-stack bs-pad" aria-label="Fire units by defence layer">
-      <div className="bs-insp__sechead">
-        <span className="BodySmallSemibold">Fire units · {units}</span>
-        <span className="BodyXSmallRegular bs-muted bs-num">{engaging ? `${engaging} engaging` : 'none engaging'}</span>
+    <Section title="Fire units" count={units}>
+      <div className="bs-fu__total">
+        {totals.map((t) => (
+          <Card key={t.label} padding={0} size="Medium" accessibilityLabel={`${t.label} ${t.value} of ${t.of}`}>
+            <CardBody>
+              <div className="bs-fu__tcell">
+                <span className="BodyXSmallRegular bs-muted">{t.label}</span>
+                <span className="bs-rings__value">
+                  <Metric type="Heading" size="Small" weight="Semibold" value={t.value} suffix="none" />
+                  <span className="BodyXSmallRegular bs-muted bs-num">/{t.of}</span>
+                </span>
+                <ProgressBar type="meter" size="Large" accessibilityLabel={`${t.label} ${t.value} of ${t.of}`} value={t.value} max={t.of || 1} color={t.color} />
+              </div>
+            </CardBody>
+          </Card>
+        ))}
+      </div>
+      <div className="bs-fu bs-fu--head" aria-hidden>
+        <span />
+        <span />
+        <span className="BodyXSmallRegular bs-muted">Channels</span>
+        <span className="BodyXSmallRegular bs-muted">Rounds</span>
       </div>
       {layers.map((l) => {
         const open = isOpen(l);
         return (
           <div key={l.id} className="bs-fl">
-            <div className="bs-fl__head">
-              <Button iconOnly size="xs" variant="ghost" tone="neutral" aria-label={`${open ? 'Hide' : 'Show'} ${l.label} units`} aria-expanded={open} onClick={() => toggle(l)}>
-                {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              </Button>
-              <span className="BodySmallSemibold bs-ellipsis">{l.label}</span>
-              <Counter value={l.units.length} size="Small" color="Neutral" emphasis="Subtle" accessibilityLabel={`${l.units.length} units`} />
-              <span className="bs-fl__tags">
-                {layerTags(l).map((t) => (
-                  <Badge key={t.label} size="Small" color={t.color} emphasis="Subtle" label={t.label} />
-                ))}
+            <div className="bs-fu">
+              <Tooltip content={`${open ? 'Hide' : 'Show'} ${l.label} units`}>
+                <Button iconOnly size="xs" variant="ghost" tone="neutral" aria-label={`${open ? 'Hide' : 'Show'} ${l.label} units`} aria-expanded={open} onClick={() => toggle(l)}>
+                  {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </Button>
+              </Tooltip>
+              <span className="bs-fu__name">
+                <span className="BodySmallMedium bs-ellipsis">{l.label}</span>
+                {l.down ? <Badge size="Small" color="Negative" emphasis="Subtle" label={`${l.down} DOWN`} /> : null}
               </span>
-            </div>
-            <div className="bs-fl__meters">
-              <ProgressBar
-                type="meter"
-                label={`Channels ${l.busy} / ${l.total}`}
-                value={l.busy}
-                max={l.total || 1}
-                // Load, like ring occupancy: blue while there is headroom, amber when every channel is busy.
-                color={l.total > 0 && l.busy >= l.total ? 'Notice' : 'Information'}
-              />
-              <ProgressBar type="meter" label={`Rounds ${l.ready} / ${l.capacity}`} value={l.ready} max={l.capacity || 1} color={MAG_COLOR[l.state]} />
+              <span className="bs-fu__meter">
+                <span className="BodySmallMedium bs-num">
+                  {l.busy}
+                  <span className="BodyXSmallRegular bs-muted"> / {l.total}</span>
+                </span>
+                <ProgressBar
+                  type="meter"
+                  size="Large"
+                  accessibilityLabel={`${l.label} channels ${l.busy} of ${l.total}`}
+                  value={l.busy}
+                  max={l.total || 1}
+                  // Load: blue while there is headroom, amber when every channel is busy.
+                  color={l.total > 0 && l.busy >= l.total ? 'Notice' : 'Information'}
+                />
+              </span>
+              <span className="bs-fu__meter">
+                <span className="BodySmallMedium bs-num">
+                  {l.ready}
+                  <span className="BodyXSmallRegular bs-muted"> / {l.capacity}</span>
+                </span>
+                <ProgressBar type="meter" size="Large" accessibilityLabel={`${l.label} rounds ${l.ready} of ${l.capacity}`} value={l.ready} max={l.capacity || 1} color={MAG_COLOR[l.state]} />
+              </span>
             </div>
             {open ? (
               <ActionList accessibilityLabel={`${l.label} units`}>
@@ -186,6 +210,6 @@ export function FireUnits({ effectors }: { effectors: Entity[] }) {
           </div>
         );
       })}
-    </section>
+    </Section>
   );
 }
