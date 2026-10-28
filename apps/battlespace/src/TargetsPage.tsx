@@ -185,7 +185,7 @@ export function TargetsPage({ presenter, onOpenOnMap }: { presenter: Presenter; 
           }}
         >
           <DropdownMenuTrigger>
-            <Button size="xs" variant="secondary" tone="neutral" leadingIcon={<ListFilter size={14} />} trailingIcon={<ChevronDown size={14} />} aria-label={`Filters${axes.length + kinds.length ? `, ${axes.length + kinds.length} on` : ''}`}>
+            <Button size="sm" variant="secondary" tone="neutral" leadingIcon={<ListFilter size={14} />} trailingIcon={<ChevronDown size={14} />} aria-label={`Filters${axes.length + kinds.length ? `, ${axes.length + kinds.length} on` : ''}`}>
               {axes.length + kinds.length ? `Filter · ${axes.length + kinds.length}` : 'Filter'}
             </Button>
           </DropdownMenuTrigger>

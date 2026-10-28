@@ -1,9 +1,9 @@
 /**
  * Timeline: two parts.
- *   - Controls: previous frame, Play, next frame, the picture time (the current frame is named to
- *     screen readers and in the frame ticks' hover cards); at the
- *     right a Show menu (which kinds of event are drawn, with their counts), the playback rate
- *     (with Replay last 30 min) and Live.
+ *   - Controls: previous frame, Play, next frame and the playback rate (with Replay last 30 min);
+ *     the picture time and the current frame are the track slider's spoken value, and in the frame
+ *     ticks' hover cards. At the right the key, a Show menu (which kinds of event are drawn, with
+ *     their counts) and Live.
  *   - Track: one blue bar (the raid window a stronger blue inside it) holding the storyboard
  *     frames as short ticks from its top edge (click to go; dragging snaps to one, Shift turns
  *     that off; [ and ] step them) and intel, decisions and rule firings on one baseline, merged
@@ -294,9 +294,46 @@ export function TimeBar({ bookmarks = [], onBookmark, current }: { bookmarks?: B
           </Button>
         </Tooltip>
         {stepButton(nextFrame, 'Next frame', ']', SkipForward)}
-        </span>
-        <span className="bs-tl__readout" aria-label={`Picture time ${readoutLabel}${frame ? `, frame ${frame.id} · ${frame.label}` : ''}`}>
-          <span className="BodyMediumSemibold bs-num">{readoutLabel}</span>
+        <DropdownMenu
+          isOpen={rateOpen}
+          onOpenChange={({ isOpen }) => setRateOpen(isOpen)}
+          selectionType="single"
+          value={[String(clock.playing ? clock.rate : rate)]}
+          onChange={({ values }) => {
+            const r = Number(values[0]);
+            if (!r) return;
+            setRate(r);
+            if (clock.playing) client.play(r);
+          }}
+        >
+          <DropdownMenuTrigger>
+            <Button size="sm" variant="secondary" tone="neutral" trailingIcon={<ChevronDown size={14} />} aria-label={`Playback rate ${clock.playing ? clock.rate : rate}×`}>
+              {`${clock.playing ? clock.rate : rate}×`}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuOverlay placement="top-start">
+            <ActionList accessibilityLabel="Playback rate">
+              <ActionListSection>
+                {RATES.map(([r, hint]) => (
+                  <ActionListItem key={r} value={String(r)} title={`${r}×`} description={hint} />
+                ))}
+              </ActionListSection>
+              <ActionListSection>
+                <ActionListItem
+                  value="replay"
+                  title="Replay last 30 min"
+                  isAction
+                  leading={<ActionListItemIcon icon={History} />}
+                  onClick={() => {
+                    client.seek(t - 30 * MINUTE);
+                    client.play(60);
+                    setRateOpen(false);
+                  }}
+                />
+              </ActionListSection>
+            </ActionList>
+          </DropdownMenuOverlay>
+        </DropdownMenu>
         </span>
         <span className="bs-fill" />
         {/* The key: what each marker's shape means; a kind hidden in Show is dimmed. */}
@@ -326,46 +363,6 @@ export function TimeBar({ bookmarks = [], onBookmark, current }: { bookmarks?: B
             </ActionList>
           </DropdownMenuOverlay>
         </DropdownMenu>
-        <DropdownMenu
-          isOpen={rateOpen}
-          onOpenChange={({ isOpen }) => setRateOpen(isOpen)}
-          selectionType="single"
-          value={[String(clock.playing ? clock.rate : rate)]}
-          onChange={({ values }) => {
-            const r = Number(values[0]);
-            if (!r) return;
-            setRate(r);
-            if (clock.playing) client.play(r);
-          }}
-        >
-          <DropdownMenuTrigger>
-            <Button size="sm" variant="secondary" tone="neutral" trailingIcon={<ChevronDown size={14} />} aria-label={`Playback rate ${clock.playing ? clock.rate : rate}×`}>
-              {`${clock.playing ? clock.rate : rate}×`}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuOverlay placement="top-end">
-            <ActionList accessibilityLabel="Playback rate">
-              <ActionListSection>
-                {RATES.map(([r, hint]) => (
-                  <ActionListItem key={r} value={String(r)} title={`${r}×`} description={hint} />
-                ))}
-              </ActionListSection>
-              <ActionListSection>
-                <ActionListItem
-                  value="replay"
-                  title="Replay last 30 min"
-                  isAction
-                  leading={<ActionListItemIcon icon={History} />}
-                  onClick={() => {
-                    client.seek(t - 30 * MINUTE);
-                    client.play(60);
-                    setRateOpen(false);
-                  }}
-                />
-              </ActionListSection>
-            </ActionList>
-          </DropdownMenuOverlay>
-        </DropdownMenu>
         {clock.mode === 'live' ? (
           <Badge size="Small" color="Positive" emphasis="Subtle" label="LIVE" />
         ) : (
@@ -390,7 +387,7 @@ export function TimeBar({ bookmarks = [], onBookmark, current }: { bookmarks?: B
         aria-valuemin={s.t0}
         aria-valuemax={s.t1}
         aria-valuenow={Math.round(t)}
-        aria-valuetext={raidLabel(t, s.clock)}
+        aria-valuetext={`${readoutLabel}${frame ? `, frame ${frame.id} · ${frame.label}` : ''}`}
         tabIndex={0}
         onKeyDown={(e) => {
           const step = (e.shiftKey ? 10 : 1) * MINUTE;

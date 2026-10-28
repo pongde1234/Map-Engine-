@@ -168,7 +168,7 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
       <div className="sv__bar">
         <DropdownMenu selectionType="single" value={[viewAs]} onChange={({ values }) => values[0] && setViewAs(values[0])}>
           <DropdownMenuTrigger>
-            <Button size="xs" variant="secondary" tone="neutral" trailingIcon={<ChevronDown size={14} />} aria-label="View as identity">
+            <Button size="sm" variant="secondary" tone="neutral" trailingIcon={<ChevronDown size={14} />} aria-label="View as identity">
               {`View as identity · ${ROLES[viewAs]?.display ?? viewAs}`}
             </Button>
           </DropdownMenuTrigger>
@@ -180,7 +180,7 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
             </ActionList>
           </DropdownMenuOverlay>
         </DropdownMenu>
-        <Button size="xs" variant="secondary" tone="neutral" leadingIcon={<MapPinned size={14} />} isDisabled={!openId} onClick={() => openId && onOpenOnMap(openId, [openId])}>
+        <Button size="sm" variant="secondary" tone="neutral" leadingIcon={<MapPinned size={14} />} isDisabled={!openId} onClick={() => openId && onOpenOnMap(openId, [openId])}>
           Open on map
         </Button>
         <span className="bs-fill" />

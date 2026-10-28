@@ -7,6 +7,7 @@ export * from './LayerList.tsx';
 export * from './SourceList.tsx';
 export * from './EventFeed.tsx';
 export * from './Inspector.tsx';
+export * from './MapHover.tsx';
 export * from './FireUnits.tsx';
 export * from './Kpi.tsx';
 export * from './Rings.tsx';

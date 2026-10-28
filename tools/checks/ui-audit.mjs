@@ -336,8 +336,8 @@ await step('entity-overview-scrolled', async () => {
 await step('frame-tick', async () => {
   await page.locator('.bs-tl__frame').nth(5).dispatchEvent('pointerdown');
   await wait(2500);
-  const named = await page.locator('.bs-tl__readout').getAttribute('aria-label');
-  if (!/B1/.test(named)) throw new Error(`frame tick did not go to B1 (readout "${named}")`);
+  const named = await page.locator('.bs-tl__lanes').getAttribute('aria-valuetext');
+  if (!/B1/.test(named)) throw new Error(`frame tick did not go to B1 (slider "${named}")`);
 });
 // Which kinds of event the track draws: the Show menu.
 await step('show-menu', async () => {

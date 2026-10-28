@@ -65,7 +65,7 @@ type TabId = 'fusion' | 'overview' | 'prov' | 'intel' | 'links' | 'activity';
 const TAB_WORD: Record<TabId, string> = { fusion: 'Fusion', overview: 'Overview', prov: 'Provenance', intel: 'Intel', links: 'Links', activity: 'Activity' };
 
 /** Display name: the leading hypothesis (or class) with an identity qualifier for tracks. */
-function entityTitle(e: Entity): string {
+export function entityTitle(e: Entity): string {
   const cls = CLASSES[e.ontology?.class ?? ''];
   if (e.ontology?.template === 'track' && cls) {
     const label = e.classification?.hypotheses[0]?.label ?? cls.label;
@@ -350,14 +350,14 @@ function Hypotheses({ e }: { e: Entity }) {
 }
 
 /** Caption word for the entity's kind. */
-function kindWord(e: Entity): string {
+export function kindWord(e: Entity): string {
   if (e.geo_shape && e.layer === 'command') return 'COMMAND OBJECT';
   if (e.layer === 'reference') return 'REFERENCE';
   if (e.fragment) return 'INTEL FRAGMENT';
   return `${e.layer.toUpperCase()} ${(e.ontology?.template ?? 'entity').toUpperCase()}`;
 }
 
-const GEO_WORD: Partial<Record<string, string>> = { wcs_sector: 'WCS sector', nfz: 'No-fly zone', sea_restriction: 'Sea restriction', picket_box: 'Picket box', wez: 'Engagement zone', debris_footprint: 'Debris footprint', soft_kill_area: 'Soft-kill area', vp: 'Defended point' };
+export const GEO_WORD: Partial<Record<string, string>> = { wcs_sector: 'WCS sector', nfz: 'No-fly zone', sea_restriction: 'Sea restriction', picket_box: 'Picket box', wez: 'Engagement zone', debris_footprint: 'Debris footprint', soft_kill_area: 'Soft-kill area', vp: 'Defended point' };
 
 /** The facts that matter for this kind of entity, most useful first. */
 /**
@@ -681,7 +681,7 @@ function TheatreSummary({ derived }: { derived: Derived }) {
 }
 
 /** Size of a shape in one line: position, length, area and perimeter, or radius. */
-function shapeSummary(shape: GeoShape): string {
+export function shapeSummary(shape: GeoShape): string {
   switch (shape.type) {
     case 'point':
       return formatMgrs(shape.coordinates);

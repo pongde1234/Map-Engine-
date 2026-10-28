@@ -429,8 +429,8 @@
   pointer-events: auto;
 }
 .bs-hud--tl {
-  top: var(--spacing-8);
-  left: var(--spacing-8);
+  top: var(--spacing-12);
+  left: var(--spacing-12);
   /* Clear of the top-right toolbar (two menus). */
   right: calc(var(--spacing-64) * 3);
   align-items: flex-start;
@@ -459,9 +459,13 @@
   }
 }
 .bs-hud--tr {
-  top: var(--spacing-8);
-  right: var(--spacing-8);
+  top: var(--spacing-12);
+  right: var(--spacing-12);
   align-items: flex-end;
+}
+/* The map toolbar floats over the map: the FDS floating-surface shadow lifts it off the basemap. */
+.bs-mapbtn {
+  box-shadow: var(--shadow-l);
 }
 .bs-hud--bl {
   bottom: var(--spacing-8);
@@ -563,13 +567,6 @@
   align-items: center;
   gap: var(--spacing-4);
 }
-/* The picture time beside Play, with the current frame's id. */
-.bs-tl__readout {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-8);
-  white-space: nowrap;
-}
 /* The track's part: the blue bar, the playhead and the labels are drawn in its SVG. */
 .bs-tl__body,
 .bs-tl__track {
@@ -609,6 +606,31 @@
   max-width: calc(var(--spacing-64) * 4);
 }
 .bs-tl__cardbody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  min-width: 0;
+}
+
+/* Map hover card (MapHover.tsx): beside the pointer, never in its way. */
+.bs-hovercard {
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+  width: max-content;
+  min-width: calc(var(--spacing-64) * 3);
+  max-width: calc(var(--spacing-64) * 4);
+  /* The FDS Card is flat; floating over the map it takes the shadow FDS gives its floating surfaces. */
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-l);
+}
+.bs-hovercard__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+  min-width: 0;
+}
+.bs-hovercard__head {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-2);

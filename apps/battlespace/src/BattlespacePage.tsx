@@ -9,7 +9,7 @@ import { ActionList, ActionListItem, ActionListItemIcon, ActionListItemText, Act
 import { ChevronDown, Compass, Eye, LocateFixed, Maximize, PanelLeft, PanelRight, PencilLine, Presentation, Ruler, Shapes } from 'lucide-react';
 import type { Bookmark } from '@me/client';
 import { MapView, useClient, useDrawState, useEngine, useView, useViewStore } from '@me/map-react';
-import { CursorReadout, DEFAULT_SHAPE, entityCenter, EventFeed, Inspector, LayerList, MeasurePopover, PromoteModal, SourceList, StatusBadges, TimeBar, ToolMenu, shortcutBlocked, toolValue, type Derived, type InspectorHandover } from '@me/ui';
+import { CursorReadout, DEFAULT_SHAPE, entityCenter, EventFeed, Inspector, LayerList, MapHover, MeasurePopover, PromoteModal, SourceList, StatusBadges, TimeBar, ToolMenu, shortcutBlocked, toolValue, type Derived, type InspectorHandover } from '@me/ui';
 import type { SketchShape, ToolKind } from '@me/map';
 import type { Presenter } from './presenter.ts';
 
@@ -175,6 +175,7 @@ export function BattlespacePage({
               ]}
             />
           ) : null}
+          <MapHover />
           <MeasurePopover hidden={promoteOpen} onKeep={() => setPromoteOpen(true)} />
           <div className="bs-hud bs-hud--tl">
             <StatusBadges />
@@ -190,7 +191,7 @@ export function BattlespacePage({
                 }}
               >
                 <DropdownMenuTrigger>
-                  <Button size="xs" variant={drawing ? 'primary' : 'secondary'} tone={drawing ? 'brand' : 'neutral'} leadingIcon={<ToolIcon size={14} />} trailingIcon={<ChevronDown size={14} />}>
+                  <Button size="sm" className="bs-mapbtn" variant={drawing ? 'primary' : 'secondary'} tone={drawing ? 'brand' : 'neutral'} leadingIcon={<ToolIcon size={14} />} trailingIcon={<ChevronDown size={14} />}>
                     Tools
                   </Button>
                 </DropdownMenuTrigger>
@@ -200,7 +201,7 @@ export function BattlespacePage({
               </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger>
-                  <Button size="xs" variant="secondary" tone="neutral" leadingIcon={<Eye size={14} />} trailingIcon={<ChevronDown size={14} />}>
+                  <Button size="sm" className="bs-mapbtn" variant="secondary" tone="neutral" leadingIcon={<Eye size={14} />} trailingIcon={<ChevronDown size={14} />}>
                     View
                   </Button>
                 </DropdownMenuTrigger>
