@@ -6,7 +6,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActionList, ActionListItem, ActionListItemIcon, ActionListItemText, ActionListSection, Button, Card, Counter, DropdownMenu, DropdownMenuOverlay, DropdownMenuTrigger, TabItem, TabList, TabPanel, Tabs } from '@faclon-labs/fds';
-import { ChevronDown, Compass, Eye, LocateFixed, Maximize, PanelLeft, PanelRight, PencilLine, Presentation, Ruler, Shapes } from 'lucide-react';
+import { ChevronDown, Eye, LocateFixed, PanelLeft, PanelRight, PencilLine, Ruler, Shapes } from 'lucide-react';
 import type { Bookmark } from '@me/client';
 import { MapView, useClient, useDrawState, useEngine, useView, useViewStore } from '@me/map-react';
 import { CursorReadout, DEFAULT_SHAPE, entityCenter, EventFeed, Inspector, LayerList, MapHover, MeasurePopover, PromoteModal, SourceList, StatusBadges, TimeBar, ToolMenu, shortcutBlocked, toolValue, type Derived, type InspectorHandover } from '@me/ui';
@@ -130,7 +130,6 @@ export function BattlespacePage({
     return () => window.removeEventListener('keydown', onKey);
   }, [client, view, panels, setPanels, engine, startTool]);
 
-  const fullscreen = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
   const drawing = sketch.tool && !sketch.done ? sketch.tool : null;
   const ToolIcon = drawing ? TOOL_ICON[drawing] : PencilLine;
 
@@ -208,16 +207,12 @@ export function BattlespacePage({
                 <DropdownMenuOverlay placement="bottom-end">
                   <ActionList accessibilityLabel="View">
                     <ActionListSection>
-                      <ActionListItem value="centre" title="Centre on the defended point" leading={<ActionListItemIcon icon={LocateFixed} />} onClick={() => s && engine?.flyTo({ center: s.center, zoom: s.zoom })} />
-                      <ActionListItem value="north" title="North up, flat" leading={<ActionListItemIcon icon={Compass} />} onClick={() => engine?.map.easeTo({ bearing: 0, pitch: 0, duration: 600 })} />
-                      <ActionListItem value="fullscreen" title="Full screen" leading={<ActionListItemIcon icon={Maximize} />} onClick={fullscreen} />
+                      {/* The defended point at the scenario zoom, north up and flat (flyTo resets both). */}
+                      <ActionListItem value="centre" title="Reset view" leading={<ActionListItemIcon icon={LocateFixed} />} onClick={() => s && engine?.flyTo({ center: s.center, zoom: s.zoom })} />
                     </ActionListSection>
                     <ActionListSection>
                       <ActionListItem value="layers" title={panels.leftOpen ? 'Hide layers panel' : 'Show layers panel'} leading={<ActionListItemIcon icon={PanelLeft} />} trailing={<ActionListItemText>L</ActionListItemText>} onClick={() => setPanels({ leftOpen: !panels.leftOpen })} />
                       <ActionListItem value="inspector" title={panels.rightOpen ? 'Hide inspector' : 'Show inspector'} leading={<ActionListItemIcon icon={PanelRight} />} trailing={<ActionListItemText>I</ActionListItemText>} onClick={() => setPanels({ rightOpen: !panels.rightOpen })} />
-                    </ActionListSection>
-                    <ActionListSection>
-                      <ActionListItem value="presenter" title={presenter.mode ? 'Presenter mode: on' : 'Presenter mode: off'} description="[ ] and PgUp/PgDn step the storyboard frames" leading={<ActionListItemIcon icon={Presentation} />} onClick={() => presenter.setMode(!presenter.mode)} />
                     </ActionListSection>
                   </ActionList>
                 </DropdownMenuOverlay>

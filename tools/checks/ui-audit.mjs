@@ -208,7 +208,7 @@ await step('load', async () => {
 await step('view-menu', async () => {
   await page.getByRole('button', { name: 'View', exact: true }).click();
   await wait(500);
-  for (const row of ['Centre on the defended point', 'North up, flat', 'Full screen', 'Hide layers panel', 'Hide inspector'])
+  for (const row of ['Reset view', 'Hide layers panel', 'Hide inspector'])
     if (!(await menuRow(row).isVisible())) throw new Error(`view menu row missing: ${row}`);
   await page.keyboard.press('Escape');
   await wait(400);
