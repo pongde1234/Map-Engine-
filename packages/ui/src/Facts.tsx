@@ -6,6 +6,7 @@
  * use inside a Card that already pads.
  */
 import type { ReactNode } from 'react';
+import { typeClass } from './type.ts';
 
 /** [label, value, wide?], or a falsy value to skip it (lets callers write `cond && [...]`). */
 export type Fact = [string, ReactNode] | [string, ReactNode, 'wide'] | null | false | undefined | '' | 0;
@@ -17,14 +18,14 @@ export function Facts({ title, items, flush }: { title?: string; items: Fact[]; 
     <section className={flush ? 'bs-facts bs-facts--flush' : 'bs-facts'} aria-label={title}>
       {title ? (
         <div className="bs-sec__head">
-          <span className="BodyMediumSemibold">{title}</span>
+          <span className={typeClass('section')}>{title}</span>
         </div>
       ) : null}
       <dl className="bs-facts__grid">
         {rows.map(([k, v, wide], i) => (
           <div key={`${i}:${k}`} className={wide ? 'bs-fact bs-fact--wide' : 'bs-fact'}>
-            <dt className="BodyXSmallRegular bs-muted">{k}</dt>
-            <dd className="BodySmallMedium bs-num bs-fact__value">{v}</dd>
+            <dt className={typeClass('caption', 'muted')}>{k}</dt>
+            <dd className={`${typeClass('value')} bs-fact__value`}>{v}</dd>
           </div>
         ))}
       </dl>

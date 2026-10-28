@@ -26,6 +26,10 @@ export interface ViewState {
   cursor: [number, number] | null;
   /** Lineage highlight: record/entity ids to emphasise on the map. */
   highlight: string[];
+  /** Where the map was last left, so another view and back finds it as it was. Not shared across windows. */
+  camera: { center: [number, number]; zoom: number; pitch: number; bearing: number } | null;
+  /** An object to bring into view (one-shot: the map takes it, flies there and clears it). */
+  locate: string | null;
 }
 
 export const DEFAULT_LAYERS: Record<string, boolean> = {
@@ -64,6 +68,8 @@ export function createViewStore(init: Partial<ViewState> = {}): ViewStore {
     coordFormat: 'mgrs',
     cursor: null,
     highlight: [],
+    camera: null,
+    locate: null,
     ...init,
   });
 }

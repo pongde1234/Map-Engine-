@@ -73,7 +73,7 @@ export function SourceList({ derived }: { derived: Derived }) {
                   description={`${e.sensor!.type.replaceAll('_', ' ')} · ${Math.round((e.sensor!.range_m ?? 0) / 1000)} km`}
                   leading={<ActionListItemIcon icon={link === 'down' ? WifiOff : Radar} />}
                   titleSuffix={<ActionListItemBadge className="bs-tag" color={st.color} emphasis="Subtle" label={st.label} />}
-                  onClick={() => view.set({ selected: e.entity_id })}
+                  onClick={() => view.set({ selected: e.entity_id, locate: e.entity_id })}
                 />
               );
             })}

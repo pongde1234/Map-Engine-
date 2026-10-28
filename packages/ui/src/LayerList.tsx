@@ -33,7 +33,7 @@ import {
  PenLine } from 'lucide-react';
 import type { AgeState } from '@me/schema';
 import { useClient, useView, useViewStore } from '@me/map-react';
-import { operatorLayerKey, type LayerKey } from '@me/map';
+import { layerTone, operatorLayerKey, toneCss, type LayerKey, type OperatorTone } from '@me/map';
 import type { Derived, LayerStat } from './derived.ts';
 import { ageLabel, AGE_BADGE } from './age.ts';
 import { LayerEntryModal, operatorLayers, operatorObjectCounts } from './OperatorLayers.tsx';
@@ -50,6 +50,8 @@ interface Row {
   age?: boolean;
   /** An operator layer: the row offers its details (review, withdraw). */
   layerId?: string;
+  /** An operator layer: the colour its objects take on the map, shown on its icon. */
+  tone?: OperatorTone;
 }
 
 interface Section {
@@ -138,6 +140,7 @@ export function LayerList({ derived }: { derived: Derived }) {
                     icon: Layers,
                     count: () => counts.get(l.entity_id) ?? 0,
                     layerId: l.entity_id,
+                    tone: layerTone(l.entity_id),
                   })),
                 ],
           ),
@@ -156,6 +159,7 @@ export function LayerList({ derived }: { derived: Derived }) {
         <SearchInput size="Small" accessibilityLabel="Filter layers" placeholder="Filter layers" value={q} onChange={({ value }) => setQ(value ?? '')} onClearButtonClick={() => setQ('')} />
       </div>
       <ScrollArea className="bs-scroll" viewportClassName="bs-scroll__viewport">
+        {!sections.length ? <p className="BodySmallRegular bs-muted bs-pad">{`No layer matches “${q.trim()}”.`}</p> : null}
         <TreeView
           selectionType="multiple"
           size="Small"
@@ -182,13 +186,13 @@ export function LayerList({ derived }: { derived: Derived }) {
                   key={r.key}
                   title={r.title}
                   value={r.key}
-                  leading={<r.icon size={12} />}
+                  leading={<r.icon size={12} {...(r.tone ? { color: toneCss(r.tone) } : {})} />}
                   trailing={<RowTrailing row={r} derived={derived} />}
                   {...(r.layerId
                     ? {
                         actions: (
                           <Tooltip content="Layer details">
-                            <IconButton icon={Ellipsis} size="Small" isHighlighted accessibilityLabel={`${r.title} details`} onClick={() => setDialog({ open: true, id: r.layerId! })} />
+                            <IconButton data-bs-tip icon={Ellipsis} size="Small" isHighlighted accessibilityLabel={`${r.title} details`} onClick={() => setDialog({ open: true, id: r.layerId! })} />
                           </Tooltip>
                         ),
                       }

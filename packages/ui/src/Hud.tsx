@@ -17,8 +17,8 @@ export function StatusBadges() {
   const down = client.conn !== 'open';
   return (
     <div className="bs-badges" role="status" aria-label="Picture status">
-      <Badge size="Small" color="Notice" emphasis="Subtle" label="SYNTHETIC" />
-      {down ? <Badge size="Small" color="Negative" emphasis="Intense" label="RECONNECTING" /> : null}
+      <Badge size="Medium" color="Neutral" emphasis="Intense" label="SYNTHETIC" />
+      {down ? <Badge size="Medium" color="Negative" emphasis="Intense" label="RECONNECTING" /> : null}
     </div>
   );
 }

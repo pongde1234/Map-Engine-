@@ -43,6 +43,14 @@ export const THEME_TOKENS = {
   zoneUnknown: '--border-neutral-highlighted',
   zoneInfo: '--background-info-default',
   focus: '--border-focused',
+  // FDS's categorical palette (for telling series apart): the colours operator layers cycle
+  // through. Orange (3) and gold (7) are left out, too close to the amber of a warning.
+  cat1: '--chart-categorical-1',
+  cat2: '--chart-categorical-2',
+  cat4: '--chart-categorical-4',
+  cat5: '--chart-categorical-5',
+  cat6: '--chart-categorical-6',
+  cat9: '--chart-categorical-9',
 } as const;
 
 export type ThemeKey = keyof typeof THEME_TOKENS;

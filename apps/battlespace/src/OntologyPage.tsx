@@ -100,7 +100,10 @@ function useHistory(e: Entity | undefined): JournalRecord[] {
       return;
     }
     let live = true;
-    client.records(e.history).then((rs) => live && setRecords([...rs].sort((a, b) => b.ingest_time - a.ingest_time)));
+    client
+      .records(e.history)
+      .then((rs) => live && setRecords([...rs].sort((a, b) => b.ingest_time - a.ingest_time)))
+      .catch(() => live && setRecords([]));
     return () => {
       live = false;
     };
@@ -151,6 +154,8 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
   const [pick, setPick] = useState<string | null>(null);
   const node = g.nodes.find((n) => n.id === pick) ?? g.nodes.find((n) => n.focus) ?? null;
   const [tab, setTab] = useState('inspector');
+  // "Open on map" opens the node the operator picked when it is an object on the map, else the graph's root.
+  const openId = node && client.entities.has(node.id) ? node.id : focusId;
   const frame = presenter.current?.page === 'ontology' ? presenter.current : undefined;
   const focusOn = (id: string) => {
     view.set({ selected: id });
@@ -175,19 +180,19 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
             </ActionList>
           </DropdownMenuOverlay>
         </DropdownMenu>
-        <Button size="xs" variant="secondary" tone="neutral" leadingIcon={<MapPinned size={14} />} isDisabled={!focusId} onClick={() => focusId && onOpenOnMap(focusId, [focusId])}>
+        <Button size="xs" variant="secondary" tone="neutral" leadingIcon={<MapPinned size={14} />} isDisabled={!openId} onClick={() => openId && onOpenOnMap(openId, [openId])}>
           Open on map
         </Button>
         <span className="bs-fill" />
         {frame ? <Badge size="Small" color="Neutral" emphasis="Subtle" label={frame.id} /> : null}
         <Badge size="Small" color="Information" emphasis="Subtle" label={`PICTURE ${clock ? raidLabel(t, clock) : formatZulu(t).slice(0, 5)}`} />
-        <Badge size="Small" color="Notice" emphasis="Subtle" label="SYNTHETIC" />
+        <Badge size="Medium" color="Neutral" emphasis="Intense" label="SYNTHETIC" />
       </div>
 
       <aside className="sv__rail" aria-label="Theater State Model">
         <ScrollArea className="bs-scroll" viewportClassName="bs-scroll__viewport">
           <div className="sv__railbody">
-            <span className="BodySmallSemibold bs-muted">THEATER STATE MODEL · FIVE LAYERS</span>
+            <span className="BodySmallSemibold">Theater state model · five layers</span>
             {layers.map((l) => (
               <section key={l.layer} className="sv__level" aria-label={l.label}>
                 <div className="tb-check__head">
@@ -208,13 +213,13 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
           <Card padding={12} size="Medium" accessibilityLabel="Lineage graph">
             <div className="tb-check">
               <div className="tb-check__head">
-                <span className="BodyXSmallSemibold">{`LINEAGE GRAPH · ${focusId ?? 'NO SOURCE RECORD'}`}</span>
+                <span className="BodySmallSemibold">{`Lineage graph · ${focusId ?? 'no source record'}`}</span>
                 <Badge className="bs-tag" size="Small" color="Neutral" emphasis="Subtle" label={loading ? 'READING' : `${g.nodes.length} NODES · ${g.edges.length} LINKS`} />
               </div>
-              {focusId ? <Graph g={g} active={node?.id ?? null} onPick={(id) => (setPick(id), setTab('inspector'))} /> : <EmptyState title="No source record" description="Select a fragment on the map or step to frame A2." />}
+              {focusId ? <Graph g={g} active={node?.id ?? null} onPick={(id) => (setPick(id), setTab('inspector'))} /> : <EmptyState title="No source record" description="Select a fragment on the map to see where it came from." />}
               <div className="on-legend">
                 {EDGE_WORDS.map((w) => (
-                  <span key={w} className="on-legend__item BodyXSmallRegular bs-muted">
+                  <span key={w} className="on-legend__item BodySmallRegular bs-muted">
                     <svg width="30" height="10" aria-hidden="true">
                       <line x1="2" y1="5" x2="28" y2="5" className={`on-edge on-edge--${slug(w)}`} />
                     </svg>
@@ -222,7 +227,7 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
                   </span>
                 ))}
                 <span className="bs-fill" />
-                <span className="BodyXSmallRegular bs-muted">{`Coloured by permission for ${ROLES[viewAs]?.display ?? viewAs}`}</span>
+                <span className="BodySmallRegular bs-muted">{`Coloured by permission for ${ROLES[viewAs]?.display ?? viewAs}`}</span>
               </div>
             </div>
           </Card>
@@ -230,8 +235,8 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
           <Card padding={12} size="Medium" accessibilityLabel="Rehearsal inset">
             <div className="tb-check">
               <div className="tb-check__head">
-                <span className="BodyXSmallSemibold">REHEARSAL INSET · CONFLICTING RADAR REPORTS</span>
-                <Badge className="bs-tag" size="Small" color="Notice" emphasis="Intense" label="REHEARSAL" />
+                <span className="BodySmallSemibold">Rehearsal inset · conflicting radar reports</span>
+                <Badge className="bs-tag" size="Medium" color="Neutral" emphasis="Intense" label="REHEARSAL" />
               </div>
               {rehearsal.reports.length ? (
                 <>
@@ -254,14 +259,14 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
                         title="Assessment · from both reports"
                         items={[
                           ['Hypotheses', rehearsal.assessment.hypotheses.map((h) => `${h.label} ${Math.round(h.p * 100)}%`).join(' · '), 'wide'],
-                          ['State', <Badge className="bs-tag" size="Small" color={rehearsal.assessment.contested ? 'Notice' : 'Positive'} emphasis="Subtle" label={rehearsal.assessment.contested ? 'CONTESTED' : 'RESOLVED'} />, 'wide'],
+                          ['State', <Badge className="bs-tag" size="Medium" color={rehearsal.assessment.contested ? 'Notice' : 'Positive'} emphasis="Subtle" label={rehearsal.assessment.contested ? 'CONTESTED' : 'RESOLVED'} />, 'wide'],
                           ['Derived from', `${rehearsal.assessment.derivedFrom.length} radar reports`, 'wide'],
                           ['Record', shortHash(rehearsal.assessment.hash)],
                         ]}
                       />
                     ) : null}
                   </div>
-                  <span className="BodyXSmallRegular bs-muted">
+                  <span className="BodySmallRegular bs-muted">
                     {`The reports put the track ${rehearsal.apartM !== null ? `${(rehearsal.apartM / 1000).toFixed(1)} km apart` : 'apart'}; the assessment keeps both. Label ${rehearsal.label ?? '—'} · read by its thread; the raid clock is unchanged.`}
                   </span>
                 </>
@@ -295,7 +300,7 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
           </ScrollArea>
         </Tabs>
         <div className="bs-insp__foot">
-          <span className="BodyXSmallRegular bs-muted">Each assessment keeps the reports that produced it. Decision out: none.</span>
+          <span className="BodySmallRegular bs-muted">Each assessment keeps the reports that produced it. Decision out: none.</span>
         </div>
       </aside>
     </div>
@@ -323,10 +328,12 @@ const layoutWidth = (l: { w: number }) => l.w;
 /** Node card height and the spacing of the columns; the card width fills the graph. */
 const NODE_H = 66;
 const NODE_H_PLAIN = 48;
-const ROW_GAP = 12;
+const ROW_GAP = 20; // between cards in a column: room for the links to read between them
 /** The gap between columns: 8% of the graph's width, between 32 and 96 px, so three columns always fit. */
 const colGap = (width: number) => Math.round(Math.min(96, Math.max(32, width * 0.08)));
 const HEAD_H = 32;
+/** Room kept round the cards, so the 2px ring of the selected one is not cut by the graph's edge. */
+const INSET = 4;
 
 /** Each link type's look: colour from the FDS tokens, a pattern of its own. */
 const EDGE_STYLE: Record<string, { stroke: string; dash?: string }> = {
@@ -342,8 +349,8 @@ interface CardData extends Record<string, unknown> {
 }
 /** The selected node and how to pick one, shared with the cards so their data stays unchanged on a selection. */
 const GraphContext = createContext<{ active: string | null; pick: (id: string) => void }>({ active: null, pick: () => {} });
-/** The graph shows at most this tall; a longer one scrolls inside it. */
-const GRAPH_MAX_H = 520;
+/** The graph shows at most this tall (more on a tall screen, where there is room); a longer one scrolls inside it. */
+const graphMaxH = () => Math.max(520, Math.round(window.innerHeight * 0.62));
 /** Up to this many links each draw as their own link; beyond it the selected node's draw that way (at most HOT_LINKS_MAX) and the rest are drawn together, faint, in one layer. */
 const ALL_LINKS_MAX = 60;
 const HOT_LINKS_MAX = 30;
@@ -385,6 +392,12 @@ const NODE_TYPES = { card: CardNode, head: HeadNode };
  */
 function Graph({ g, active, onPick }: { g: OntologyGraph; active: string | null; onPick: (id: string) => void }) {
   const box = useRef<HTMLDivElement>(null);
+  const [maxH, setMaxH] = useState(graphMaxH);
+  useEffect(() => {
+    const onResize = () => setMaxH(graphMaxH());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   // Measured before the graph is drawn: React Flow fixes its bounds when it mounts, so a guessed
   // width would leave the graph shifted inside a wider box.
   const [width, setWidth] = useState<number | null>(null);
@@ -399,13 +412,13 @@ function Graph({ g, active, onPick }: { g: OntologyGraph; active: string | null;
   const layout = useMemo(() => {
     const W = width ?? 720;
     const gap = colGap(W);
-    const w = Math.max(110, Math.floor((W - 2 * gap) / 3));
+    const w = Math.max(110, Math.floor((W - 2 * INSET - 2 * gap) / 3));
     const col = new Map<string, number>();
     const pos = new Map<string, { x: number; y: number; h: number }>();
     const flow: Array<Node<CardData, 'card'> | Node<HeadData, 'head'>> = [];
     let tallest = 0;
     GRAPH_COLUMNS.forEach((c, ci) => {
-      const x = ci * (w + gap);
+      const x = INSET + ci * (w + gap);
       flow.push({ id: `head:${c.id}`, type: 'head', position: { x, y: 0 }, data: { w, title: c.layers.map((l) => LAYER_WORD[l]).join(' · ') }, draggable: false, selectable: false, focusable: false });
       const mine = g.nodes.filter((n) => c.layers.includes(n.layer)).sort((a, b) => c.layers.indexOf(a.layer) - c.layers.indexOf(b.layer));
       let y = HEAD_H;
@@ -474,10 +487,10 @@ function Graph({ g, active, onPick }: { g: OntologyGraph; active: string | null;
     }
     return { edges: links, rest: [...faint] };
   }, [g, layout, active]);
-  const scrolls = layout.contentH > GRAPH_MAX_H;
+  const scrolls = layout.contentH > maxH;
   const ctx = useMemo(() => ({ active, pick: onPick }), [active, onPick]);
   return (
-    <div className="on-graph" ref={box} style={{ height: Math.min(layout.contentH, GRAPH_MAX_H) }}>
+    <div className="on-graph" ref={box} style={{ height: Math.min(layout.contentH, maxH) }}>
       <GraphContext.Provider value={ctx}>
       {width !== null ? (
       <ReactFlow
@@ -526,10 +539,10 @@ function NodeCard({ n, isActive, onPick }: { n: GraphNode; isActive: boolean; on
   return (
     <Card data-node={n.id} padding={0} size="Medium" isSelected={isActive} opacity={n.permitted === 'none' ? 0.55 : 1} accessibilityLabel={`${n.label}, ${p.label.toLowerCase()}`} onClick={onPick}>
       <div className="on-node">
-        <span className="BodyXSmallSemibold bs-ellipsis">{n.label}</span>
-        <span className="BodyXSmallRegular bs-muted bs-ellipsis">{n.focus ? `Source record · ${n.detail}` : `${LAYER_WORD[n.layer]} · ${n.detail}`}</span>
+        <span className="BodySmallSemibold bs-ellipsis">{n.label}</span>
+        <span className="BodySmallRegular bs-muted bs-ellipsis">{n.focus ? `Source record · ${n.detail}` : `${LAYER_WORD[n.layer]} · ${n.detail}`}</span>
         {/* Permission is stated only when it is not complete: a fully permitted node is the usual. */}
-        {n.permitted !== 'all' ? <Badge className="bs-tag" size="Small" color={p.color} emphasis="Subtle" label={p.label} /> : null}
+        {n.permitted !== 'all' ? <Badge className="bs-tag" size="Medium" color={p.color} emphasis="Subtle" label={p.label} /> : null}
       </div>
     </Card>
   );
@@ -547,9 +560,9 @@ function Inspector({ node, lineage, clock, root, onFocus }: { node: GraphNode; l
         <div className="tb-check">
           <div className="tb-check__head">
             <span className="BodySmallSemibold">{node.label}</span>
-            {node.permitted !== 'all' ? <Badge className="bs-tag" size="Small" color={PERMISSION[node.permitted].color} emphasis="Subtle" label={PERMISSION[node.permitted].label} /> : null}
+            {node.permitted !== 'all' ? <Badge className="bs-tag" size="Medium" color={PERMISSION[node.permitted].color} emphasis="Subtle" label={PERMISSION[node.permitted].label} /> : null}
           </div>
-          <span className="BodyXSmallRegular bs-muted">{`${LAYER_WORD[node.layer]} layer · ${node.detail} · prepared before the raid`}</span>
+          <span className="BodySmallRegular bs-muted">{`${LAYER_WORD[node.layer]} layer · ${node.detail} · prepared before the raid`}</span>
           <ActionList accessibilityLabel={`${node.label} members`}>
             {members.map((m) => (
               <ActionListItem
@@ -575,9 +588,9 @@ function Inspector({ node, lineage, clock, root, onFocus }: { node: GraphNode; l
       <div className="tb-check">
         <div className="tb-check__head">
           <span className="BodySmallSemibold bs-ellipsis">{node.label}</span>
-          {node.permitted !== 'all' ? <Badge className="bs-tag" size="Small" color={PERMISSION[node.permitted].color} emphasis="Subtle" label={PERMISSION[node.permitted].label} /> : null}
+          {node.permitted !== 'all' ? <Badge className="bs-tag" size="Medium" color={PERMISSION[node.permitted].color} emphasis="Subtle" label={PERMISSION[node.permitted].label} /> : null}
         </div>
-        <span className="BodyXSmallRegular bs-muted">{`${LAYER_WORD[node.layer]} layer · ${node.detail}`}</span>
+        <span className="BodySmallRegular bs-muted">{`${LAYER_WORD[node.layer]} layer · ${node.detail}`}</span>
         <Facts
           title="Envelope"
           flush
@@ -626,7 +639,7 @@ function History({ node, lineage, clock }: { node: GraphNode; lineage: JournalRe
               value={r.record_id}
               title={r.kind === 'decision' || r.kind === 'engagement' || r.kind === 'bda' ? eventSummary(r).title : `${LAYER_WORD[r.layer as keyof typeof LAYER_WORD] ?? r.layer} record`}
               description={`${stamp(r.ingest_time, clock)} · ${r.provenance.source_feed}${r.derived_from?.length ? ` · derived from ${r.derived_from.length}` : ''} · ${shortHash(r.hash)}`}
-              titleSuffix={<ActionListItemBadge className="bs-tag" size="Small" color="Neutral" emphasis="Subtle" label={r.label} />}
+              titleSuffix={<ActionListItemBadge className="bs-tag" size="Medium" color="Neutral" emphasis="Subtle" label={r.label} />}
             />
           ))}
         </ActionList>

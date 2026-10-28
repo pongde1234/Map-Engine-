@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "scenario": "pnpm --filter @me/scenario generate",
     "check:denylist": "node tools/checks/denylist.mjs",
-    "check": "pnpm typecheck && pnpm test && pnpm check:denylist"
+    "check": "pnpm typecheck && pnpm test && pnpm check:denylist && pnpm check:type",
+    "check:type": "node tools/checks/type-lint.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

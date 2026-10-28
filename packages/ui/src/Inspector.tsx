@@ -18,6 +18,10 @@ import {
   Badge,
   Button,
   Card,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
   ProgressBar,
   ScrollArea,
   TabItem,
@@ -27,14 +31,18 @@ import {
   Tooltip,
   useToast,
 } from '@faclon-labs/fds';
+import { useState } from 'react';
 import { Boxes, Crosshair, FileSearch, Gavel, MapPin, Radar, ShieldAlert, Swords, TriangleAlert, Wrench, X } from 'lucide-react';
-import { CLASSES, formatZulu, sidcWithIdentity, watchedBy, type EngagementPayload, type Entity, type GeoShape, type JournalRecord } from '@me/schema';
+import { CLASSES, formatZulu, sidcWithIdentity, watchedBy, type EngagementPayload, type Entity, type GeoShape, type JournalRecord, type OperatorColor } from '@me/schema';
 import { distance, formatArea, formatDistance, formatMgrs, formatRangeBearing, headingSpeed, inverse, pathLength, pointInShape, ringArea } from '@me/geo';
 import type { MapClient } from '@me/client';
+import { operatorTone, toneColor, toneCss } from '@me/map';
 import { useClient, useEngineTime, useEvents, useLineage, useSelectedEntity, useViewStore } from '@me/map-react';
+import { ColorPicker } from './ColorPicker.tsx';
 import { SymbolGlyph } from './glyphs.tsx';
 import { FireUnits } from './FireUnits.tsx';
 import { Rings } from './Rings.tsx';
+import { TheatreStrip } from './TheatreStrip.tsx';
 import { RaidGroups } from './RaidGroups.tsx';
 import { MAG_COLOR, magState } from './magazine.ts';
 import { Facts, type Fact } from './Facts.tsx';
@@ -99,20 +107,49 @@ function EntityInspector({ e, derived, onNominate, onAsk }: { e: Entity; derived
   const loc = e.location ? ([e.location.lon, e.location.lat] as [number, number]) : null;
   const top = e.classification?.hypotheses[0];
   const evidence = e.track?.sensor_classes?.length ? e.track.sensor_classes.join(' + ') : (e.provenance.sensor_class ?? e.provenance.source_feed);
-  const withdraw = async () => {
+  const [confirming, setConfirming] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const name = e.aliases?.name ?? e.entity_id;
+  // A withdrawn object leaves the picture, and the engine does not take its id back: restoring it
+  // draws the same shape again as a new object (its layer, colour and note kept).
+  const restore = async () => {
+    if (!e.geo_shape || !e.geo_details) return;
+    const { author: _author, ...details } = e.geo_details;
     try {
-      await client.publish({ entity_id: e.entity_id, payload: { is_live: false } });
-      toast.show({ color: 'Neutral', content: `“${e.aliases?.name ?? e.entity_id}” withdrawn.` });
-      view.set({ selected: null });
+      const rec = await client.publish({ payload: { ...(e.aliases ? { aliases: e.aliases } : {}), geo_shape: e.geo_shape, geo_details: details } });
+      toast.show({ color: 'Positive', content: `“${name}” is back on the map.` });
+      view.set({ selected: rec.entity_id ?? null });
     } catch (err) {
       toast.show({ color: 'Negative', content: (err as Error).message });
     }
   };
+  const withdraw = async () => {
+    setWithdrawing(true);
+    try {
+      await client.publish({ entity_id: e.entity_id, payload: { is_live: false } });
+      setConfirming(false);
+      toast.show({ color: 'Neutral', content: `“${name}” withdrawn.`, ...(e.geo_shape ? { action: { text: 'Undo', onClick: () => void restore() }, duration: 8000 } : {}) });
+      view.set({ selected: null });
+    } catch (err) {
+      toast.show({ color: 'Negative', content: (err as Error).message });
+    } finally {
+      setWithdrawing(false);
+    }
+  };
   return (
     <div className="bs-insp">
+      {/* The theatre stays in view while an object is inspected; a click returns to the full summary. */}
+      <div className="bs-insp__pin">
+        <TheatreStrip
+          derived={derived}
+          channels={client.scenario?.counts.saturationThreshold ?? 0}
+          engaging={derived.effectors.filter((x) => (x.effector?.channels.busy ?? 0) > 0).length}
+          onOpen={() => view.set({ selected: null, highlight: [] })}
+        />
+      </div>
       <div className="bs-insp__head">
         <div className="bs-insp__caption">
-          <span className="BodyXSmallMedium bs-muted bs-ellipsis">
+          <span className="BodySmallMedium bs-muted bs-ellipsis">
             {ref} · {kindWord(e)}
           </span>
           <Tooltip content="Clear selection (Esc)">
@@ -123,19 +160,22 @@ function EntityInspector({ e, derived, onNominate, onAsk }: { e: Entity; derived
         </div>
         <div className="bs-insp__title">
           {sidc ? <SymbolGlyph sidc={sidc} size={20} title={CLASSES[e.ontology?.class ?? '']?.label} /> : null}
+          {operatorObject && e.geo_shape ? (
+            <span className="bs-swatch" role="img" aria-label="Its colour on the map" style={{ background: toneCss(operatorTone(e.geo_details, !!(e.geo_details?.layer && client.entities.has(e.geo_details.layer)))) }} />
+          ) : null}
           <span className="HeadingSmallSemibold bs-ellipsis">{entityTitle(e)}</span>
         </div>
         <div className="bs-insp__chips">
-          {e.classification?.contested ? <Badge size="Small" color="Notice" emphasis="Intense" label="CONTESTED" /> : null}
-          {e.mil_view ? <Badge size="Small" color={IDENTITY_COLOR[e.mil_view.identity]} emphasis="Subtle" label={e.mil_view.identity.replace('_', ' ').toUpperCase()} /> : null}
+          {e.classification?.contested ? <Badge size="Medium" color="Neutral" emphasis="Intense" label="CONTESTED" /> : null}
+          {e.mil_view ? <Badge size="Medium" color={IDENTITY_COLOR[e.mil_view.identity]} emphasis="Subtle" label={e.mil_view.identity.replace('_', ' ').toUpperCase()} /> : null}
           {e.track?.state && e.track.state !== 'detected' && e.track.state !== 'inbound' ? (
-            <Badge size="Small" color={e.track.state === 'destroyed' ? 'Positive' : 'Notice'} emphasis="Subtle" label={e.track.state.toUpperCase()} />
+            <Badge size="Medium" color={e.track.state === 'destroyed' ? 'Positive' : 'Notice'} emphasis="Subtle" label={e.track.state.toUpperCase()} />
           ) : null}
           {commandObject ? (
             // Command objects do not age: they hold until withdrawn or expired.
-            <Badge size="Small" color={e.geo_details?.status === 'active' ? 'Positive' : 'Neutral'} emphasis="Subtle" label={(e.geo_details?.status ?? 'active').toUpperCase()} />
+            <Badge size="Medium" color={e.geo_details?.status === 'active' ? 'Positive' : 'Neutral'} emphasis="Subtle" label={(e.geo_details?.status ?? 'active').toUpperCase()} />
           ) : (
-            <Badge size="Small" color={AGE_BADGE[age]} emphasis="Subtle" label={age === 'disc' ? 'DISC · NO LINK' : `${AGE_WORD[age]} · ${ageLabel(ageMs)}`} />
+            <Badge size="Medium" color={AGE_BADGE[age]} emphasis="Subtle" label={age === 'disc' ? 'DISC · NO LINK' : `${AGE_WORD[age]} · ${ageLabel(ageMs)}`} />
           )}
           {operatorObject ? <Badge size="Small" color="Information" emphasis="Subtle" label="DRAWN" /> : null}
         </div>
@@ -156,6 +196,7 @@ function EntityInspector({ e, derived, onNominate, onAsk }: { e: Entity; derived
               {e.classification ? <Hypotheses e={e} /> : null}
               {e.fragment ? <p className="BodySmallRegular bs-pad">{e.fragment.summary}</p> : null}
               <Facts items={overviewFacts(e, client, derived, t)} />
+              {operatorObject && e.geo_shape && e.geo_details ? <ObjectColor e={e} /> : null}
               {fusedTrack ? (
                 <Facts
                   title="Provenance"
@@ -171,7 +212,7 @@ function EntityInspector({ e, derived, onNominate, onAsk }: { e: Entity; derived
                 />
               ) : (
                 <div className="bs-sourceline">
-                  <span className="BodyXSmallRegular bs-muted bs-ellipsis">
+                  <span className="BodySmallRegular bs-muted bs-ellipsis">
                     {e.provenance.source_feed} · {when(e.ingest_time)}
                   </span>
                   <ChainBadge />
@@ -242,7 +283,7 @@ function EntityInspector({ e, derived, onNominate, onAsk }: { e: Entity; derived
                 Close
               </Button>
               <Tooltip content="Removes it from the map; the original stays in the record">
-                <Button size="sm" variant="primary" tone="negative" isFullWidth onClick={() => void withdraw()}>
+                <Button size="sm" variant="primary" tone="negative" isFullWidth onClick={() => setConfirming(true)}>
                   Withdraw
                 </Button>
               </Tooltip>
@@ -264,6 +305,20 @@ function EntityInspector({ e, derived, onNominate, onAsk }: { e: Entity; derived
           ) : null}
         </div>
       ) : null}
+      <Modal isOpen={confirming} onDismiss={() => setConfirming(false)} size="sm" accessibilityLabel="Withdraw object">
+        <ModalHeader title={`Withdraw “${name}”?`} />
+        <ModalBody>
+          <p className="BodyMediumRegular">It leaves the map from this time on. The original stays in the record{e.geo_shape ? ', and Undo in the notice that follows draws it again' : ''}.</p>
+        </ModalBody>
+        <ModalFooter>
+          <Button size="sm" variant="secondary" tone="neutral" onClick={() => setConfirming(false)}>
+            Cancel
+          </Button>
+          <Button size="sm" variant="primary" tone="negative" isLoading={withdrawing} onClick={() => void withdraw()}>
+            Withdraw
+          </Button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 }
@@ -273,19 +328,19 @@ function Hypotheses({ e }: { e: Entity }) {
   const c = e.classification!;
   const evidence = e.track?.sensor_classes?.length ? e.track.sensor_classes.join(' + ') : (e.provenance.sensor_class ?? e.provenance.source_feed);
   return (
-    <Section title="Hypotheses within margin" trailing={<span className="BodyXSmallRegular bs-muted bs-num">margin {c.margin.toFixed(2)}</span>}>
+    <Section title="Hypotheses within margin" trailing={<span className="BodySmallRegular bs-ink-secondary bs-num">margin {c.margin.toFixed(2)}</span>}>
       {c.hypotheses.map((h, i) => {
         const lk = LIKELIHOOD(h.p);
         return (
           <Card key={h.class} padding={12} size="Medium" isSelected={i === 0}>
             <div className="bs-hcard">
               <span className="bs-hcard__text">
-                <span className="BodySmallSemibold bs-ellipsis">{h.label}</span>
-                <span className="BodyXSmallRegular bs-muted">
+                <span className="BodyMediumMedium bs-ellipsis">{h.label}</span>
+                <span className="BodySmallRegular bs-ink-secondary">
                   p {h.p.toFixed(2)} · {evidence}
                 </span>
               </span>
-              <Badge size="Small" color={lk.color} emphasis={i === 0 ? 'Intense' : 'Subtle'} label={lk.word} />
+              <Badge size="Medium" color={lk.color} emphasis="Subtle" label={lk.word} />
             </div>
           </Card>
         );
@@ -305,6 +360,35 @@ function kindWord(e: Entity): string {
 const GEO_WORD: Partial<Record<string, string>> = { wcs_sector: 'WCS sector', nfz: 'No-fly zone', sea_restriction: 'Sea restriction', picket_box: 'Picket box', wez: 'Engagement zone', debris_footprint: 'Debris footprint', soft_kill_area: 'Soft-kill area', vp: 'Defended point' };
 
 /** The facts that matter for this kind of entity, most useful first. */
+/**
+ * A drawn object's colour on the map: the console's pick until the operator chooses another.
+ * Choosing records the object again at the picture time, as the operator, with the colour set;
+ * resetting records it without one. A geofence's colour changes without re-running its rule.
+ */
+function ObjectColor({ e }: { e: Entity }) {
+  const client = useClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const gd = e.geo_details!;
+  const layerLive = !!(gd.layer && client.entities.has(gd.layer));
+  const set = async (color?: OperatorColor) => {
+    setBusy(true);
+    try {
+      const { color: _old, ...rest } = gd;
+      await client.publish({ entity_id: e.entity_id, payload: { ...(e.aliases ? { aliases: e.aliases } : {}), geo_shape: e.geo_shape!, geo_details: { ...rest, ...(color ? { color } : {}) } } });
+    } catch (err) {
+      toast.show({ color: 'Negative', content: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Section title="Colour on the map">
+      <ColorPicker value={toneColor(operatorTone(gd, layerLive))} isDefault={!gd.color} isDisabled={busy} onChange={(c) => void set(c)} onReset={() => void set()} />
+    </Section>
+  );
+}
+
 function overviewFacts(e: Entity, client: MapClient, derived: Derived, t: number): Fact[] {
   const loc = e.location ? ([e.location.lon, e.location.lat] as [number, number]) : null;
   const rb = loc ? inverse(derived.center, loc) : null;
@@ -321,7 +405,7 @@ function overviewFacts(e: Entity, client: MapClient, derived: Derived, t: number
     !!vel && (vel.e !== 0 || vel.n !== 0) && ['Heading', `${String(Math.round(headingSpeed(vel).heading) % 360).padStart(3, '0')}°`],
     e.track?.axis && ['Axis · wave', `${e.track.axis} · ${e.track.wave ?? '—'}`],
     // Fire units.
-    e.effector && ['Status', <Badge size="Small" color={e.effector.status === 'down' ? 'Negative' : e.effector.status === 'engaging' ? 'Notice' : 'Positive'} emphasis="Subtle" label={e.effector.status.toUpperCase()} />],
+    e.effector && ['Status', <Badge size="Medium" color={e.effector.status === 'down' ? 'Negative' : e.effector.status === 'engaging' ? 'Notice' : 'Positive'} emphasis="Subtle" label={e.effector.status.toUpperCase()} />],
     e.effector && ['Channels', `${e.effector.channels.busy} / ${e.effector.channels.total} in use`],
     mag && [
       'Magazine',
@@ -344,8 +428,8 @@ function overviewFacts(e: Entity, client: MapClient, derived: Derived, t: number
     e.plant?.interlock && ['Interlock', e.plant.interlock],
     // Intel fragments.
     e.fragment && ['Source', e.fragment.source_kind.replaceAll('_', ' ')],
-    e.fragment && ['Confidence', <Badge size="Small" color={e.fragment.confidence === 'confirmed' ? 'Positive' : e.fragment.confidence === 'likely' ? 'Notice' : 'Neutral'} emphasis="Subtle" label={e.fragment.confidence.toUpperCase()} />],
-    e.fragment && ['Associated', e.fragment.associated ? 'Yes' : <Badge size="Small" color="Neutral" emphasis="Intense" label="UNASSOCIATED" />],
+    e.fragment && ['Confidence', <Badge size="Medium" color={e.fragment.confidence === 'confirmed' ? 'Positive' : e.fragment.confidence === 'likely' ? 'Notice' : 'Neutral'} emphasis="Subtle" label={e.fragment.confidence.toUpperCase()} />],
+    e.fragment && ['Associated', e.fragment.associated ? 'Yes' : <Badge size="Medium" color="Neutral" emphasis="Intense" label="UNASSOCIATED" />],
     e.location_uncertainty && ['Uncertainty', `${(e.location_uncertainty.semi_major_m / 1000).toFixed(1)} × ${(e.location_uncertainty.semi_minor_m / 1000).toFixed(1)} km`],
     // Raid groups.
     e.group && ['Members', String(e.group.members.length)],
@@ -356,7 +440,7 @@ function overviewFacts(e: Entity, client: MapClient, derived: Derived, t: number
     gd?.ring && ['Ring', gd.ring],
     // A predicted aimpoint's time on target is a forecast, counted from the picture time.
     gd?.tot !== undefined && ['Time on target', `${raidLabel(gd.tot, client.scenario?.clock)} · ${gd.tot > t ? `in ${Math.ceil((gd.tot - t) / 60_000)} min` : 'passed'} · forecast`, 'wide'],
-    gd?.wcs && ['Weapons control', <Badge size="Small" color={gd.wcs === 'free' ? 'Negative' : gd.wcs === 'tight' ? 'Notice' : 'Positive'} emphasis="Subtle" label={gd.wcs.toUpperCase()} />],
+    gd?.wcs && ['Weapons control', <Badge size="Medium" color={gd.wcs === 'free' ? 'Negative' : gd.wcs === 'tight' ? 'Notice' : 'Positive'} emphasis="Subtle" label={gd.wcs.toUpperCase()} />],
     gd?.tier !== undefined && !e.plant && ['Tier', `Tier ${gd.tier}`],
     gd?.watch && ['Alert on', gd.watch === 'any' ? 'Any track' : `${gd.watch[0]!.toUpperCase()}${gd.watch.slice(1)} tracks`],
     gd?.type === 'geofence' && e.geo_shape && ['Inside now', String(insideNow(client, e.geo_shape, gd.watch ?? 'hostile', t))],
@@ -378,7 +462,7 @@ function ChainBadge() {
       </span>
     </Tooltip>
   ) : (
-    <Badge size="Small" color="Negative" emphasis="Intense" label={`BROKEN AT ${h.chain.brokenAt}`} />
+    <Badge size="Medium" color="Negative" emphasis="Intense" label={`BROKEN AT ${h.chain.brokenAt}`} />
   );
 }
 
@@ -410,7 +494,7 @@ function Lineage({ id, meaningful }: { id: string; meaningful: JournalRecord[] }
               // The time leads the second line (as in the event feed), so nothing is pushed past the row.
               description={`${raidLabel(r.ingest_time, clock)} · ${r.kind} · ${shortHash(r.hash)}`}
               leading={<ActionListItemIcon icon={KIND_ICON[r.kind as keyof typeof KIND_ICON] ?? Boxes} />}
-              onClick={() => s.subject && s.subject !== id && view.set({ selected: s.subject })}
+              onClick={() => s.subject && s.subject !== id && view.set({ selected: s.subject, locate: s.subject })}
             />
           );
         })}
@@ -433,8 +517,8 @@ function Evidence({ e }: { e: Entity }) {
       {sensors.map(({ id, s }) => (
         <Card key={id} padding={12} size="Medium">
           <span className="bs-hcard__text">
-            <span className="BodySmallSemibold bs-ellipsis">{s?.aliases?.name ?? id}</span>
-            <span className="BodyXSmallRegular bs-muted">
+            <span className="BodyMediumMedium bs-ellipsis">{s?.aliases?.name ?? id}</span>
+            <span className="BodySmallRegular bs-ink-secondary">
               {s?.sensor ? `${s.sensor.type.replaceAll('_', ' ')} · ${Math.round((s.sensor.range_m ?? 0) / 1000)} km · ${s.health?.link ?? s.sensor.status}` : 'contributing sensor'}
             </span>
           </span>
@@ -445,10 +529,10 @@ function Evidence({ e }: { e: Entity }) {
         return (
           <Card key={r.record_id} padding={12} size="Medium">
             <span className="bs-hcard__text">
-              <span className="BodySmallSemibold">
+              <span className="BodyMediumMedium">
                 {raidLabel(r.ingest_time, clock)} · {sum.title}
               </span>
-              {sum.detail ? <span className="BodyXSmallRegular bs-muted">{sum.detail}</span> : null}
+              {sum.detail ? <span className="BodySmallRegular bs-ink-secondary">{sum.detail}</span> : null}
             </span>
           </Card>
         );
@@ -541,7 +625,7 @@ function LinkedObjects({ links }: { links: Link[] }) {
             title={l.text}
             leading={<ActionListItemIcon icon={l.icon} />}
             trailing={<ActionListItemText>{l.ref}</ActionListItemText>}
-            onClick={() => view.set({ selected: l.ref })}
+            onClick={() => view.set({ selected: l.ref, locate: l.ref })}
           />
         ))}
       </ActionList>
@@ -588,7 +672,7 @@ function TheatreSummary({ derived }: { derived: Derived }) {
   return (
     <ScrollArea className="bs-scroll" viewportClassName="bs-scroll__viewport">
       <div className="bs-divided">
-        <Rings rings={derived.rings} channels={threshold} />
+        <Rings rings={derived.rings} closing={derived.closing} channels={threshold} />
         <RaidGroups groups={derived.groups} />
         <FireUnits effectors={derived.effectors} />
       </div>

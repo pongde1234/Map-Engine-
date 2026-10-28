@@ -3,15 +3,33 @@
  * clicker) and the `?bm=` / `?t=` / `?sel=` deep links. A frame seeks the time, sets the
  * selection and opens its page; the map's camera applies once the map page has its engine
  * (`pending`), so a frame on another page (A2, the Ontology Explorer) steps like any other.
+ *
+ * The keys work only in presenter mode (`?presenter` in the URL, or the View menu, remembered for
+ * the session), so nobody changes the time, the selection or the page by pressing PgUp or ] in a
+ * list. The timeline's step buttons work in both modes.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Bookmark, MapClient, ViewStore } from '@me/client';
+import { shortcutBlocked } from '@me/ui';
 import { storyboardBookmarks } from './bookmarks.ts';
 
 /** The frame whose time the console opens at, and the board falls back to when it is empty. */
 export const DEMO_FRAME = 'B4';
 
+const MODE_KEY = 'bs.presenter';
+function initialMode(): boolean {
+  try {
+    if (new URLSearchParams(location.search).has('presenter')) return true;
+    return sessionStorage.getItem(MODE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export interface Presenter {
+  /** The frame keys are on. */
+  mode: boolean;
+  setMode(on: boolean): void;
   bookmarks: Bookmark[];
   index: number;
   current: Bookmark | undefined;
@@ -27,6 +45,15 @@ export function usePresenter(client: MapClient, view: ViewStore, setPage: (page:
   const bookmarks = useMemo(() => (s ? storyboardBookmarks(s) : []), [s]);
   const [index, setIndex] = useState(-1);
   const [pending, setPending] = useState<Bookmark | null>(null);
+  const [mode, setModeState] = useState(initialMode);
+  const setMode = useCallback((on: boolean) => {
+    setModeState(on);
+    try {
+      sessionStorage.setItem(MODE_KEY, on ? '1' : '0');
+    } catch {
+      // A private window keeps it for the page only.
+    }
+  }, []);
 
   const go = useCallback(
     (b: Bookmark) => {
@@ -53,9 +80,9 @@ export function usePresenter(client: MapClient, view: ViewStore, setPage: (page:
   );
 
   useEffect(() => {
+    if (!mode) return;
     const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement;
-      if (el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable || e.ctrlKey || e.metaKey) return;
+      if (shortcutBlocked(e)) return;
       if (e.key === ']' || e.key === 'PageDown') {
         e.preventDefault();
         step(1);
@@ -66,7 +93,7 @@ export function usePresenter(client: MapClient, view: ViewStore, setPage: (page:
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [step]);
+  }, [step, mode]);
 
   // Deep links (Target Board "Compare on map", evidence packs) apply once the scenario is known,
   // then leave the URL, so returning to a page keeps the operator's own time and selection.
@@ -92,5 +119,5 @@ export function usePresenter(client: MapClient, view: ViewStore, setPage: (page:
   }, [linked, s, bookmarks, go, client, view]);
 
   const applied = useCallback(() => setPending(null), []);
-  return { bookmarks, index, current: index >= 0 ? bookmarks[index] : undefined, go, step, pending, applied };
+  return { mode, setMode, bookmarks, index, current: index >= 0 ? bookmarks[index] : undefined, go, step, pending, applied };
 }

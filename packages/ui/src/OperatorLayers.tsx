@@ -9,7 +9,7 @@ import { Badge, Button, Modal, ModalBody, ModalFooter, ModalHeader, TextInput, u
 import type { Entity, EntityComponents } from '@me/schema';
 import type { MapClient } from '@me/client';
 import { useClient, useEngineTime } from '@me/map-react';
-import { Facts } from './Facts.tsx';
+import { Review } from './Review.tsx';
 import { raidLabel } from './format.ts';
 
 /** The operator's layers in the picture, by name. */
@@ -52,6 +52,7 @@ export function LayerEntryModal({ isOpen, layerId, onClose }: { isOpen: boolean;
     if (!isOpen) return;
     setName('');
     setNote('');
+    setBusy(false);
     setError(null);
   }, [isOpen]);
 
@@ -94,17 +95,20 @@ export function LayerEntryModal({ isOpen, layerId, onClose }: { isOpen: boolean;
     const count = operatorObjectCounts(client).get(existing.entity_id) ?? 0;
     return (
       <Modal isOpen={isOpen} onDismiss={onClose} size="sm" accessibilityLabel="Operator layer">
-        <ModalHeader title={existing.aliases?.name ?? existing.entity_id} subtitle={`Operator layer · set by ${existing.geo_details.author ?? '—'} at ${raidLabel(existing.ingest_time, clock)}`} />
+        <ModalHeader title={existing.aliases?.name ?? existing.entity_id} subtitle="Operator layer" />
         <ModalBody>
-          <Facts
-            items={[
-              ['Objects', count ? `${count} drawn object${count === 1 ? '' : 's'}` : 'None yet', 'wide'],
+          <Review
+            lead={count ? `${count} drawn object${count === 1 ? '' : 's'}` : 'No drawn objects yet'}
+            facts={[
+              ['Set by', existing.geo_details.author ?? '—'],
+              ['Set at', raidLabel(existing.ingest_time, clock)],
               ['Label', <Badge size="Small" color="Notice" emphasis="Subtle" label={existing.label} />],
               !!existing.geo_details.note && ['Note', existing.geo_details.note, 'wide'],
               ['Permission', existing.releasability?.join(' · ') ?? '—', 'wide'],
             ]}
+            note="Withdrawing removes the layer from now on; its objects stay on the map, back in Operator objects."
           />
-          {error ? <p className="BodySmallRegular bs-muted">{error}</p> : null}
+          {error ? <p role="alert" className="BodySmallRegular bs-ink-negative">{error}</p> : null}
         </ModalBody>
         <ModalFooter>
           <Button size="sm" variant="secondary" tone="neutral" onClick={onClose}>
@@ -129,7 +133,7 @@ export function LayerEntryModal({ isOpen, layerId, onClose }: { isOpen: boolean;
           <div className="bs-form__wide">
             <TextInput label="Note" value={note} onChange={({ value }) => setNote(value ?? '')} placeholder="What it is for" maxCharacters={80} />
           </div>
-          {error && name.trim() ? <p className="BodySmallRegular bs-muted bs-form__wide">{error}</p> : null}
+          {error && name.trim() ? <p role="alert" className="BodySmallRegular bs-ink-negative bs-form__wide">{error}</p> : null}
         </div>
       </ModalBody>
       <ModalFooter>

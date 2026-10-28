@@ -156,6 +156,14 @@ export const GeoType = z.enum([
 ]);
 export type GeoType = z.infer<typeof GeoType>;
 
+/**
+ * The colours an operator can give a drawn object. Names, not values: the record stays the same
+ * across themes, and the console resolves each to an FDS token. Red is left out (hostile) and so
+ * is the blue of selection.
+ */
+export const OperatorColor = z.enum(['sapphire', 'indigo', 'green', 'teal', 'pink', 'lavender', 'steel', 'amber']);
+export type OperatorColor = z.infer<typeof OperatorColor>;
+
 export const GeoDetails = z.object({
   type: GeoType,
   ring: z.enum(['R1', 'R2', 'R3', 'R4']).optional(),
@@ -180,6 +188,8 @@ export const GeoDetails = z.object({
   /** Operator objects: the operator layer it sits in (that layer's entity id). Without one, or once
    *  that layer is withdrawn, it sits in "Operator objects". */
   layer: z.string().optional(),
+  /** Operator objects: the colour the operator chose. Without one, the console picks (its layer's, or its type's). */
+  color: OperatorColor.optional(),
 });
 export type GeoDetails = z.infer<typeof GeoDetails>;
 

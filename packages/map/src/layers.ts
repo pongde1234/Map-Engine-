@@ -15,6 +15,7 @@ import type { Atlas } from '@me/symbology';
 import type { MapTheme, RGBA } from './theme.ts';
 import { alpha } from './theme.ts';
 import { operatorLayerKey, type LayerKey } from './categorize.ts';
+import { operatorTone } from './tone.ts';
 import type { DrawState, SketchMeasure } from './draw.ts';
 
 export interface AreaItem {
@@ -32,7 +33,17 @@ export interface AreaItem {
   width: number;
   /** Operator objects: the operator layer it sits in, whose own toggle shows or hides it. */
   layer?: string;
+  /** Its fill shows at rest (a light wash of its colour), not only when hovered or selected. */
+  wash?: boolean;
 }
+
+/** The rest alpha of an operator object's wash; it reads lighter on a light map than a dark one. */
+const WASH = { light: 40, dark: 50 };
+/** How much stronger the wash gets under the pointer. */
+const WASH_HOVER = 32;
+/** The border of an operator object on a light map: its colour scaled toward black by this much. */
+const STROKE_DEEPEN = 0.78;
+const deepen = (c: RGBA, k: number): RGBA => [Math.round(c[0] * k), Math.round(c[1] * k), Math.round(c[2] * k), c[3]];
 
 export interface TrackItem {
   id: string;
@@ -78,18 +89,20 @@ export interface FrameCtx {
 
 // ------------------------------------------------------------------ areas (built per entity version)
 
-export function areaFor(e: Entity, key: LayerKey, theme: MapTheme): AreaItem | null {
+export function areaFor(e: Entity, key: LayerKey, theme: MapTheme, layerLive = false): AreaItem | null {
   const shape = e.geo_shape;
   if (!shape) return null;
   const r = theme.rgba;
   const gd = e.geo_details;
   // A restrained palette: neutral by default, amber for warnings, red only for threats; blue is
   // kept for selection. Fills show only on hover or selection (areaLayers), so these are the
-  // colours an area takes when it is looked at.
+  // colours an area takes when it is looked at. Operator objects are the exception: each has a
+  // colour of its own (tone.ts) and a light wash of it at rest.
   let fill: RGBA = alpha(r.lineStrong, 0);
   let stroke: RGBA = alpha(r.lineStrong, 200);
   let dashed = false;
   let width = 1;
+  let wash = false;
   switch (key) {
     case 'command.rings':
       stroke = alpha(r.textSubtle, 140);
@@ -128,18 +141,19 @@ export function areaFor(e: Entity, key: LayerKey, theme: MapTheme): AreaItem | n
       width = 1.5;
       dashed = true;
       break;
-    case 'command.operator':
-      // Geofences and operator NFZs are warnings; other operator objects are neutral.
-      if (gd?.type === 'geofence' || gd?.type === 'nfz') {
-        fill = alpha(r.notice, 20);
-        stroke = alpha(r.notice, 230);
-        dashed = true;
-      } else {
-        fill = alpha(r.text, 16);
-        stroke = alpha(r.text, 210);
-      }
+    case 'command.operator': {
+      // Geofences and operator NFZs are warnings (amber, dashed); the rest take their layer's or
+      // their type's colour. Stroke and fill are one colour, the fill light enough to see through.
+      const tone = r[operatorTone(gd, layerLive)];
+      fill = alpha(tone, theme.dark ? WASH.dark : WASH.light);
+      // The border is the same colour at full strength, a notch deeper on a light map, so the
+      // outline reads dark against its light wash.
+      stroke = alpha(theme.dark ? tone : deepen(tone, STROKE_DEEPEN), 255);
+      dashed = gd?.type === 'geofence' || gd?.type === 'nfz';
+      wash = true;
       width = 1.5;
       break;
+    }
     case 'reference.vp': {
       // Defended assets: Tier-1 notice, Tier-2 neutral. Red stays reserved for hostile/aimpoints.
       const complex = e.entity_id === 'VP-RIL';
@@ -184,7 +198,7 @@ export function areaFor(e: Entity, key: LayerKey, theme: MapTheme): AreaItem | n
   }
   const polygons = shapeToPolygon(shape);
   const labelAt = labelPoint(shape, polygons);
-  return { id: e.entity_id, key, polygons, label, labelAt, fill, stroke, dashed, width };
+  return { id: e.entity_id, key, polygons, label, labelAt, fill, stroke, dashed, width, ...(wash ? { wash } : {}) };
 }
 
 function labelPoint(shape: NonNullable<Entity['geo_shape']>, polys: LonLat[][]): LonLat | undefined {
@@ -235,8 +249,8 @@ export function declutter<T>(
   offsetX = 0,
   placed: Array<[number, number, number, number]> = [],
 ): T[] {
-  const CHAR_W = 6.6;
-  const H = 13;
+  const CHAR_W = 7.3;
+  const H = 14;
   const out: T[] = [];
   const sorted = [...items].sort((a, b) => priority(b) - priority(a));
   for (const d of sorted) {
@@ -260,6 +274,10 @@ export function areaLayers(areas: AreaItem[], ctx: FrameCtx): Layer[] {
   const lines = vis.filter((a) => a.line);
   const points = vis.filter((a) => a.point);
   const dash = new PathStyleExtension({ dash: true });
+  // The edge of an area: the selected one turns to the focus colour, except an operator object,
+  // which keeps its own colour (so choosing it a colour shows) and is ringed by a halo instead.
+  const edge = (a: AreaItem): RGBA => (a.id === ctx.selected && !a.wash ? ctx.theme.rgba.focus : a.stroke);
+  const halo = vis.filter((a) => a.wash && a.id === ctx.selected);
   // Labels on demand: the area hovered or selected, or every area once zoomed in.
   const labels = declutter(
     vis.filter((a) => a.label && a.labelAt && (a.id === ctx.selected || a.id === ctx.hovered || ctx.zoom >= labelZoom(a.key))),
@@ -271,25 +289,47 @@ export function areaLayers(areas: AreaItem[], ctx: FrameCtx): Layer[] {
     ctx.placed,
   );
   return [
-    // Areas are outlines; the fill shows only on the area hovered or selected. Every polygon
-    // stays in this layer at a near-zero alpha, since the fill is what makes an area pickable.
+    // Areas are outlines; the fill shows only on the area hovered or selected, except an operator
+    // object, which keeps a light wash of its colour at rest. Every polygon stays in this layer at
+    // a near-zero alpha at least, since the fill is what makes an area pickable.
     new PolygonLayer<AreaItem>({
       id: 'areas-fill',
       data: polys,
       ...before(ctx),
       getPolygon: (a) => a.polygons,
-      getFillColor: (a) => (a.id === ctx.selected ? alpha(a.fill, Math.min(255, a.fill[3] + 40)) : a.id === ctx.hovered ? a.fill : alpha(a.fill, 1)),
+      getFillColor: (a) =>
+        a.id === ctx.selected
+          ? alpha(a.fill, Math.min(255, a.fill[3] + 40))
+          : a.id === ctx.hovered
+            ? a.wash
+              ? alpha(a.fill, a.fill[3] + WASH_HOVER)
+              : a.fill
+            : a.wash
+              ? a.fill
+              : alpha(a.fill, 1),
       stroked: false,
       filled: true,
       pickable: true,
       updateTriggers: { getFillColor: [ctx.selected, ctx.hovered, ctx.theme] },
+    }) as unknown as Layer,
+    // The selected operator object: a soft focus-coloured ring under its own coloured edge.
+    new PathLayer<{ a: AreaItem; path: LonLat[] }>({
+      id: 'areas-halo',
+      data: halo.flatMap((a) => (a.line ? [{ a, path: a.line }] : a.polygons.map((p) => ({ a, path: p })))),
+      ...before(ctx),
+      getPath: (d) => d.path,
+      getColor: alpha(ctx.theme.rgba.focus, 120),
+      getWidth: (d) => d.a.width + 6,
+      widthUnits: 'pixels',
+      jointRounded: true,
+      updateTriggers: { getColor: [ctx.theme] },
     }) as unknown as Layer,
     new PathLayer<{ a: AreaItem; path: LonLat[] }>({
       id: 'areas-stroke',
       data: polys.flatMap((a) => a.polygons.map((p) => ({ a, path: p }))),
       ...before(ctx),
       getPath: (d) => d.path,
-      getColor: (d) => (d.a.id === ctx.selected ? ctx.theme.rgba.focus : d.a.stroke),
+      getColor: (d) => edge(d.a),
       getWidth: (d) => (d.a.id === ctx.selected ? d.a.width + 1 : d.a.width),
       widthUnits: 'pixels',
       ...dashed<{ a: AreaItem }>((d) => (d.a.dashed ? [6, 4] : [0, 0]), dash),
@@ -300,7 +340,7 @@ export function areaLayers(areas: AreaItem[], ctx: FrameCtx): Layer[] {
       data: lines,
       ...before(ctx),
       getPath: (a) => a.line!,
-      getColor: (a) => (a.id === ctx.selected ? ctx.theme.rgba.focus : a.stroke),
+      getColor: (a) => edge(a),
       getWidth: (a) => (a.id === ctx.selected ? a.width + 1 : a.width),
       widthUnits: 'pixels',
       ...dashed<AreaItem>((a) => (a.dashed ? [10, 6] : [0, 0]), dash),
@@ -314,7 +354,7 @@ export function areaLayers(areas: AreaItem[], ctx: FrameCtx): Layer[] {
       getRadius: (a) => (a.id === ctx.selected ? 7 : 5),
       radiusUnits: 'pixels',
       getFillColor: (a) => alpha(a.stroke, 90),
-      getLineColor: (a) => (a.id === ctx.selected ? ctx.theme.rgba.focus : a.stroke),
+      getLineColor: (a) => edge(a),
       lineWidthUnits: 'pixels',
       getLineWidth: 2,
       stroked: true,
@@ -331,7 +371,7 @@ export function areaLayers(areas: AreaItem[], ctx: FrameCtx): Layer[] {
             getPosition: (a) => a.labelAt!,
             getText: (a) => a.label!,
             getPixelOffset: (a) => (a.point ? [9, 0] : [0, 0]),
-            getSize: 11,
+            getSize: 12,
             getColor: (a) => alpha(a.stroke, 235),
             fontFamily: 'JetBrains Mono Variable, JetBrains Mono, monospace',
             fontWeight: 500,
@@ -377,7 +417,7 @@ export function groupMarkerLayers(markers: GroupMarker[], ctx: FrameCtx): Layer[
       data: markers,
       getPosition: (d) => d.pos,
       getText: (d) => String(d.count),
-      getSize: 11,
+      getSize: 12,
       getColor: alpha(r.sunken, 255),
       getTextAnchor: 'middle',
       getAlignmentBaseline: 'center',
@@ -532,7 +572,7 @@ export function trackLayers(items: TrackItem[], ctx: FrameCtx): Layer[] {
           data: labelled,
           getPosition: (d) => [d.pos[0], d.pos[1]],
           getText: (d) => d.label,
-          getSize: 11,
+          getSize: 12,
           getColor: (d) => (d.hostile ? r.text : alpha(r.textSubtle, 235)),
           getPixelOffset: (d) => [d.size * 0.65, 0],
           getTextAnchor: 'start',
@@ -666,7 +706,9 @@ function nextStep(s: DrawState): string | null {
 export function sketchLayers(s: DrawState, m: SketchMeasure, ctx: FrameCtx): Layer[] {
   if (!s.tool || !s.points.length) return [];
   const r = ctx.theme.rgba;
-  const tone = s.tool === 'geofence' ? r.notice : r.focus;
+  // The colour the object will take once kept: amber for a geofence, emerald for a measurement,
+  // sapphire for a drawing (its type or layer, chosen when it is promoted, may change that).
+  const tone = r[s.tool === 'geofence' ? 'notice' : s.tool === 'measure' ? 'positive' : 'info'];
   const dash = new PathStyleExtension({ dash: true });
   const pts = s.points;
   const live = !s.done && s.cursor ? s.cursor : null;
@@ -747,7 +789,7 @@ export function sketchLayers(s: DrawState, m: SketchMeasure, ctx: FrameCtx): Lay
       data: labels,
       getPosition: (d) => d.at,
       getText: (d) => d.text,
-      getSize: (d) => (d.hint ? 11 : 12),
+      getSize: 12,
       getColor: (d) => (d.hint ? alpha(r.text, 190) : alpha(r.text, 250)),
       getPixelOffset: (d) => (d.hint ? [10, 10] : [10, -10]),
       fontFamily: 'JetBrains Mono Variable, JetBrains Mono, monospace',

@@ -14,14 +14,14 @@ export function RaidGroups({ groups }: { groups: Entity[] }) {
   const size = (g: Entity) => g.group?.members.length ?? 0;
   const total = groups.reduce((a, g) => a + size(g), 0);
   return (
-    <Section title="Raid groups" count={groups.length} trailing={<span className="BodyXSmallRegular bs-muted bs-num">{total} tracks</span>}>
+    <Section title="Raid groups" count={groups.length} trailing={<span className="BodySmallRegular bs-muted bs-num">{total} tracks</span>}>
       <ActionList accessibilityLabel="Raid groups">
         {groups.map((g) => (
           <ActionListItem
             key={g.entity_id}
             value={g.entity_id}
             title={g.aliases?.name ?? g.entity_id}
-            titleSuffix={<span className="BodyXSmallRegular bs-muted bs-num bs-rg__sfx">{[g.group?.axis, g.group?.wave].filter(Boolean).join(' · ')}</span>}
+            titleSuffix={<span className="BodySmallRegular bs-muted bs-num bs-rg__sfx">{[g.group?.axis, g.group?.wave].filter(Boolean).join(' · ')}</span>}
             trailing={
               <span className="bs-rg__end">
                 <ProgressBar type="meter" size="Large" accessibilityLabel={`${g.aliases?.name ?? g.entity_id} share of tracks`} value={size(g)} max={total || 1} color="Negative" />
@@ -30,7 +30,7 @@ export function RaidGroups({ groups }: { groups: Entity[] }) {
                 </span>
               </span>
             }
-            onClick={() => view.set({ selected: g.entity_id, highlight: g.group?.members ?? [] })}
+            onClick={() => view.set({ selected: g.entity_id, locate: g.entity_id, highlight: g.group?.members ?? [] })}
           />
         ))}
       </ActionList>

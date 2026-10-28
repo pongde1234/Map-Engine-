@@ -131,7 +131,7 @@ export function EventFeed({ limit = 200 }: { limit?: number }) {
             </ActionList>
           </DropdownMenuOverlay>
         </DropdownMenu>
-        <span className="BodyXSmallRegular bs-muted bs-num bs-feedbar__count">
+        <span className="BodySmallRegular bs-muted bs-num bs-feedbar__count">
           {matching === received ? received : `${matching} / ${received}`}
         </span>
       </div>
@@ -152,8 +152,8 @@ export function EventFeed({ limit = 200 }: { limit?: number }) {
                   isSelected={!!s.subject && s.subject === selected}
                   intent={r.kind === 'rule_fire' && sev === 'high' ? 'negative' : undefined}
                   leading={<ActionListItemIcon icon={ICON[r.kind as keyof typeof ICON] ?? FileSearch} />}
-                  {...(badge ? { titleSuffix: <ActionListItemBadge className="bs-tag" size="Small" color={badge.color} emphasis="Subtle" label={badge.label} /> } : {})}
-                  onClick={() => s.subject && view.set({ selected: s.subject })}
+                  {...(badge ? { titleSuffix: <ActionListItemBadge className="bs-tag" size="Medium" color={badge.color} emphasis="Subtle" label={badge.label} /> } : {})}
+                  onClick={() => s.subject && view.set({ selected: s.subject, locate: s.subject })}
                 />
               );
             })}

@@ -26,7 +26,7 @@ import {
 import { CLASSES, type AlertRule, type Entity, type EntityComponents, type RuleFirePayload } from '@me/schema';
 import type { MapClient } from '@me/client';
 import { useClient, useEngineTime, useEvents } from '@me/map-react';
-import { Facts } from './Facts.tsx';
+import { Review } from './Review.tsx';
 import { raidLabel } from './format.ts';
 import { WATCH } from './sketch.ts';
 
@@ -125,7 +125,7 @@ export function CustomAlertList({ onOpen }: { onOpen: (id: string) => void }) {
             value={e.entity_id}
             title={e.aliases?.name ?? e.entity_id}
             description={`${alertSummary(rule, client)}${last !== undefined ? ` · ${raidLabel(last, clock)}` : ''}`}
-            titleSuffix={<ActionListItemBadge className="bs-tag" size="Small" color={state === 'fired' ? SEVERITY_COLOR[rule.severity] : 'Neutral'} emphasis="Subtle" label={state === 'fired' ? 'FIRED' : state === 'clear' ? 'CLEAR' : 'ARMED'} />}
+            titleSuffix={<ActionListItemBadge className="bs-tag" size="Medium" color={state === 'fired' ? SEVERITY_COLOR[rule.severity] : 'Neutral'} emphasis="Subtle" label={state === 'fired' ? 'FIRED' : state === 'clear' ? 'CLEAR' : 'ARMED'} />}
             onClick={() => onOpen(e.entity_id)}
           />
         ))}
@@ -145,6 +145,7 @@ export function AlertRuleModal({ isOpen, alertId, onClose }: { isOpen: boolean; 
   const clock = client.scenario?.clock;
   const who = client.identity;
   const existing = alertId ? client.entities.get(alertId) : undefined;
+  const alertState = useCustomAlerts().find((a) => a.e.entity_id === alertId)?.state ?? 'armed';
   const [name, setName] = useState('');
   const [condition, setCondition] = useState<Condition>('count_in_ring');
   const [watch, setWatch] = useState<NonNullable<AlertRule['watch']>>('hostile');
@@ -168,6 +169,11 @@ export function AlertRuleModal({ isOpen, alertId, onClose }: { isOpen: boolean; 
     setLevel('floor');
     setReady('');
     setSeverity('high');
+    // The rest of the form too: nothing from the last time the dialog was open.
+    setWatch('hostile');
+    setRing('R3');
+    setClasses(['cruise_missile']);
+    setBusy(false);
     setError(null);
   }, [isOpen]);
   const units = [...client.entities.values()].filter((e) => e.ontology?.template === 'effector' && e.effector?.magazine).sort((a, b) => (a.aliases?.name ?? '').localeCompare(b.aliases?.name ?? ''));
@@ -233,17 +239,21 @@ export function AlertRuleModal({ isOpen, alertId, onClose }: { isOpen: boolean; 
     const rule = existing.alert_rule;
     return (
       <Modal isOpen={isOpen} onDismiss={onClose} size="sm" accessibilityLabel="Custom alert">
-        <ModalHeader title={existing.aliases?.name ?? existing.entity_id} subtitle={`Custom alert · set by ${existing.geo_details?.author ?? '—'} at ${raidLabel(existing.ingest_time, clock)}`} />
+        <ModalHeader title={existing.aliases?.name ?? existing.entity_id} subtitle="Custom alert" />
         <ModalBody>
-          <Facts
-            items={[
-              ['Watches', alertSummary(rule, client), 'wide'],
-              ['Severity', <Badge size="Small" color={SEVERITY_COLOR[rule.severity]} emphasis="Subtle" label={rule.severity.toUpperCase()} />],
+          <Review
+            lead={alertSummary(rule, client)}
+            state={<Badge size="Medium" color={alertState === 'fired' ? SEVERITY_COLOR[rule.severity] : 'Neutral'} emphasis="Subtle" label={alertState.toUpperCase()} />}
+            facts={[
+              ['Severity', <Badge size="Medium" color={SEVERITY_COLOR[rule.severity]} emphasis="Subtle" label={rule.severity.toUpperCase()} />],
               ['Label', <Badge size="Small" color="Notice" emphasis="Subtle" label={existing.label} />],
+              ['Set by', existing.geo_details?.author ?? '—'],
+              ['Set at', raidLabel(existing.ingest_time, clock)],
               ['Permission', existing.releasability?.join(' · ') ?? '—', 'wide'],
             ]}
+            note="Withdrawing stops the alert from now on; its firings and the record stay."
           />
-          {error ? <p className="BodySmallRegular bs-muted">{error}</p> : null}
+          {error ? <p role="alert" className="BodySmallRegular bs-ink-negative">{error}</p> : null}
         </ModalBody>
         <ModalFooter>
           <Button size="sm" variant="secondary" tone="neutral" onClick={onClose}>
@@ -299,7 +309,7 @@ export function AlertRuleModal({ isOpen, alertId, onClose }: { isOpen: boolean; 
             </DropdownMenu>
           ) : null}
           <Pick label="Severity" value={severity} options={SEVERITIES} onChange={setSeverity} />
-          {error && name.trim() ? <p className="BodySmallRegular bs-muted bs-form__wide">{error}</p> : null}
+          {error && name.trim() ? <p role="alert" className="BodySmallRegular bs-ink-negative bs-form__wide">{error}</p> : null}
         </div>
       </ModalBody>
       <ModalFooter>

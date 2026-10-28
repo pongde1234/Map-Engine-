@@ -64,6 +64,8 @@
 .bs-time {
   flex: none;
   border-top: var(--border-width-thin) solid var(--border-neutral-default);
+  /* The same surface as the side panels. */
+  background: var(--background-surface-intense);
 }
 
 /* ---------- tabs that fill their column (left panel, inspector) ---------- */
@@ -98,31 +100,42 @@
   min-height: 0;
 }
 /* Fire units: one grid row per defence layer, its units listed beneath it when open. */
-.bs-fl {
+/* Fire units table (FireUnits.tsx): a header over an FDS ActionList. Each row's trailing slot
+   holds the two meter columns at fixed widths, so figures and meters line up down the list and
+   under the header; the header carries the same right inset as the rows. */
+.bs-fu--head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) calc(var(--spacing-64) + var(--spacing-8)) calc(var(--spacing-64) + var(--spacing-8));
+  align-items: center;
+  gap: var(--spacing-12);
+  /* "Layer" over the names: past the list and row insets (8 + 8) and the chevron with its gap (24). */
+  padding-inline: calc(var(--spacing-16) + var(--spacing-24)) var(--spacing-16);
+  min-width: 0;
+}
+.bs-fu__cells {
+  display: grid;
+  grid-template-columns: calc(var(--spacing-64) + var(--spacing-8)) calc(var(--spacing-64) + var(--spacing-8));
+  gap: var(--spacing-12);
+  align-items: center;
+}
+/* One ActionList per layer; an open layer's units end with an FDS Divider. */
+.bs-fu__groups {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-4);
-  min-width: 0;
 }
-.bs-fu {
-  display: grid;
-  grid-template-columns: var(--spacing-24) minmax(0, 1fr) calc(var(--spacing-64) + var(--spacing-8)) calc(var(--spacing-64) + var(--spacing-8));
-  align-items: center;
-  gap: var(--spacing-8);
-  min-width: 0;
+/* The rule closing an open layer is as wide as the rows that opened (the list's own 8px inset
+   each side), not the whole section. */
+.bs-fu__rule {
+  padding-inline: var(--spacing-8);
 }
-.bs-fu--head {
-  margin-bottom: calc(var(--spacing-4) * -1);
+/* A layer's name is a step above its units': medium against their regular. */
+.bs-fu__item:not(.bs-fu__item--unit) .ds-action-list-item__title {
+  font-weight: var(--font-weight-medium);
 }
-.bs-fl {
-  padding-block: var(--spacing-4);
-}
-.bs-fu__name {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--spacing-4) var(--spacing-6);
-  min-width: 0;
+/* A unit's name sits under its layer's name: the indent takes the chevron's place. */
+.bs-fu__indent {
+  display: inline-block;
+  width: var(--spacing-16);
 }
 .bs-fu__meter {
   display: flex;
@@ -130,51 +143,148 @@
   gap: var(--spacing-4);
   min-width: 0;
 }
+/* A meter with the reserve floor marked: a thin tick over the bar at floor / capacity. */
+.bs-meter {
+  position: relative;
+  display: block;
+}
+.bs-meter__floor {
+  position: absolute;
+  top: calc(var(--spacing-2) * -1);
+  bottom: calc(var(--spacing-2) * -1);
+  width: var(--border-width-thick);
+  margin-left: calc(var(--border-width-thick) / -2);
+  border-radius: var(--radius-s);
+  background: var(--text-neutral-normal);
+  pointer-events: none;
+}
 
-/* Hostile tracks per ring: four cells, outer to inner. */
-.bs-rings {
+/* Metric tiles (Kpi.tsx): two a row, sharing hairlines, out to the section's edges (its 12px
+   padding), with a line above the first row. The tiles carry the section's 12px inset inside.
+   As a section's last block the grid also runs to its foot, so the hairlines meet the divider. */
+.bs-kpis {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--spacing-8);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-inline: calc(var(--spacing-12) * -1);
+  border-top: var(--border-width-thin) solid var(--border-neutral-default);
 }
-.bs-rings__item {
-  min-width: 0;
-  border-radius: var(--radius-m);
+.bs-kpis:last-child {
+  margin-bottom: calc(var(--spacing-12) * -1);
 }
-.bs-rings__item:focus-visible {
-  outline: var(--border-width-thick) solid var(--border-focused);
-  outline-offset: var(--spacing-2);
-}
-.bs-rings__cell {
+.bs-kpi {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-4);
-  padding: var(--spacing-8);
+  gap: var(--spacing-8);
+  padding: var(--spacing-16) var(--spacing-12);
   min-width: 0;
 }
-.bs-rings__name {
+.bs-kpi:nth-child(odd) {
+  border-right: var(--border-width-thin) solid var(--border-neutral-default);
+}
+.bs-kpi:nth-child(n + 3) {
+  border-top: var(--border-width-thin) solid var(--border-neutral-default);
+}
+.bs-kpi__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--spacing-4);
+  gap: var(--spacing-8);
+  min-width: 0;
 }
-.bs-rings__value {
+.bs-kpi__icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--spacing-24);
+  height: var(--spacing-24);
+  border-radius: 50%;
+}
+.bs-kpi__icon--neutral {
+  background: var(--background-neutral-faded);
+  color: var(--text-neutral-muted);
+}
+.bs-kpi__icon--notice {
+  background: var(--background-notice-faded);
+  color: var(--text-notice-normal);
+}
+.bs-kpi__icon--negative {
+  background: var(--background-negative-faded);
+  color: var(--text-negative-normal);
+}
+.bs-kpi__icon--positive {
+  background: var(--background-positive-faded);
+  color: var(--text-positive-normal);
+}
+.bs-kpi__icon--brand {
+  background: var(--background-brand-faded);
+  color: var(--text-brand-normal);
+}
+.bs-kpi__value {
   display: flex;
   align-items: baseline;
+  gap: var(--spacing-4);
+  min-width: 0;
+}
+.bs-kpi__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-6);
+  min-width: 0;
+}
+.bs-kpi__trend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  white-space: nowrap;
+}
+.bs-kpi__trend--neutral {
+  color: var(--text-neutral-muted);
+}
+.bs-kpi__trend--notice {
+  color: var(--text-notice-normal);
+}
+.bs-kpi__trend--negative {
+  color: var(--text-negative-normal);
+}
+.bs-kpi__trend--positive {
+  color: var(--text-positive-normal);
+}
+.bs-kpi__trend--brand {
+  color: var(--text-brand-normal);
+}
+.bs-kpi__note {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The fire units' totals sit as the section's last row of tiles, before the layer grid. */
+.bs-fu__tiles {
+  margin-bottom: var(--spacing-4);
+  border-bottom: var(--border-width-thin) solid var(--border-neutral-default);
+}
+/* A dot in an operator object's map colour (its layer's, or its type's). */
+.bs-swatch {
+  display: inline-block;
+  flex: none;
+  width: var(--spacing-8);
+  height: var(--spacing-8);
+  border-radius: 50%;
+}
+.bs-swatch--lg {
+  width: var(--spacing-12);
+  height: var(--spacing-12);
+}
+.bs-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--spacing-2);
 }
-/* Fire units' totals: two Cards, same anatomy as a ring. */
-.bs-fu__total {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--spacing-8);
-}
-.bs-fu__tcell {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-4);
-  padding: var(--spacing-8) var(--spacing-12);
-  min-width: 0;
+.bs-swatch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-6);
 }
 /* The end of a list row: a figure, its meter or limit, then the count. */
 .bs-rg__end {
@@ -238,6 +348,21 @@
 }
 .bs-facts--flush {
   padding: 0;
+}
+/* A review dialog's body (Review.tsx): the lead line, the facts, the withdraw note. */
+.bs-review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-16);
+}
+.bs-review__lead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-8);
+}
+.bs-review__note {
+  margin: 0;
 }
 
 .bs-facts__grid {
@@ -406,10 +531,13 @@
   flex-direction: column;
   min-width: 0;
 }
+/* The likelihood word is never cut: the evidence line beside it wraps instead. */
+.bs-hcard > .ds-badge {
+  flex: none;
+}
 
 /* ---------- timeline ---------- */
-/* One control strip, then the ruler and the event row at full width. */
-/* Room to breathe: 12px between the strip and the ruler, 16px at the sides. */
+/* Two parts: the controls, then the track (the blue bar); 12px between them, 16px at the sides. */
 .bs-tl {
   display: flex;
   flex-direction: column;
@@ -417,6 +545,7 @@
   padding: var(--spacing-12) var(--spacing-16) var(--spacing-16);
   min-width: 0;
 }
+/* The controls own the line under them: edge to edge (across the 16px side padding), 12px above the line as below it. */
 .bs-tl__bar {
   display: flex;
   flex-wrap: wrap;
@@ -424,31 +553,42 @@
   gap: var(--spacing-12);
   min-height: var(--spacing-32);
   min-width: 0;
+  margin-inline: calc(var(--spacing-16) * -1);
+  padding: 0 var(--spacing-16) var(--spacing-12);
+  border-bottom: var(--border-width-thin) solid var(--border-neutral-default);
 }
-/* The legend: each kind's shape and count, quiet; off is dimmed. */
-.bs-tl__legend {
+/* Previous frame, Play, next frame: one tight group. */
+.bs-tl__transport {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-4);
 }
-.bs-tl__legend [aria-pressed='false'] {
-  opacity: 0.4;
-}
-/* The picture time, one line: the raid label and its Zulu time. */
+/* The picture time beside Play, with the current frame's id. */
 .bs-tl__readout {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--spacing-8);
   white-space: nowrap;
 }
-/* Text for screen readers where a chip shows only its shape. */
-.bs-tl__sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
+/* The track's part: the blue bar, the playhead and the labels are drawn in its SVG. */
+.bs-tl__body,
+.bs-tl__track {
+  min-width: 0;
+}
+/* The key beside Show: each marker's shape and its name; a kind hidden in Show is dimmed. */
+.bs-tl__key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-12);
+}
+.bs-tl__keyitem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-4);
   white-space: nowrap;
+}
+.bs-tl__keyitem--off {
+  opacity: 0.4;
 }
 .bs-tl__lanes {
   position: relative;
@@ -567,8 +707,24 @@
   white-space: nowrap;
   min-width: 0;
 }
+/* The three inks (type.ts): normal is the text colour; secondary is for facts that carry data,
+   muted for labels and units. Chromatic ink is the -normal token: -subtle and -muted fail contrast. */
 .bs-muted {
   color: var(--text-neutral-muted);
+}
+/* FDS's muted ink is 4.33:1 on a dark panel (4.5:1 is the least for text this size), so in dark
+   our muted text takes the subtle ink; light keeps the three apart (muted is 5.3:1 there). */
+:root[data-theme='dark'] .bs-muted {
+  color: var(--text-neutral-subtle);
+}
+.bs-ink-secondary {
+  color: var(--text-neutral-subtle);
+}
+.bs-ink-negative {
+  color: var(--text-negative-normal);
+}
+.bs-ink-notice {
+  color: var(--text-notice-normal);
 }
 .bs-num {
   white-space: nowrap;
@@ -577,4 +733,61 @@
 .bs-glyph {
   display: block;
   flex: none;
+}
+/* A span around a disabled button, so the tooltip still has something to hover. */
+.bs-tip-wrap {
+  display: inline-flex;
+}
+.bs-tip-wrap > button {
+  pointer-events: none;
+}
+
+/* The timeline's track and its raid window, from FDS's faded brand tone. That tone is opacity-based
+   (8% / 24% on a light surface, 32% / 40% on a dark one), so each theme sets how strongly it is
+   laid: pale but plain in light, deep and quiet in dark. */
+:root {
+  --bs-tl-track: var(--background-brand-faded-highlighted);
+  --bs-tl-track-o: 0.6;
+  --bs-tl-window: var(--background-brand-faded-highlighted);
+  --bs-tl-window-o: 1;
+}
+:root[data-theme='dark'] {
+  --bs-tl-track: var(--background-brand-faded);
+  --bs-tl-track-o: 0.45;
+  --bs-tl-window: var(--background-brand-faded);
+  --bs-tl-window-o: 0.8;
+}
+/* The link banner sits above the view tabs, on the same 12px gutter, and takes no room when the link is up. */
+.bs-conn {
+  flex: none;
+  padding: var(--spacing-12) var(--spacing-12) 0;
+}
+/* The theatre strip above an object's details: one tight row, a rule beneath it. */
+.bs-insp__pin {
+  flex: none;
+  padding: var(--spacing-4);
+  border-bottom: var(--border-width-thin) solid var(--border-neutral-default);
+}
+.bs-pin {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-8);
+  min-width: 0;
+  white-space: nowrap;
+}
+.bs-pin__ring {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--spacing-2);
+}
+.bs-pin__sep {
+  flex: 1 1 auto;
+}
+/* The strip is one nowrap row: FDS's button label would clip it at its own width, so here it grows to the row. */
+.bs-insp__pin .ds-btn__content {
+  width: 100%;
+}
+.bs-insp__pin .ds-btn__label {
+  flex: 1 1 auto;
+  overflow: visible;
 }

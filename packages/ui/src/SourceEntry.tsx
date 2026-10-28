@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { Badge, Button, Modal, ModalBody, ModalFooter, ModalHeader, TextInput, useToast } from '@faclon-labs/fds';
 import type { Entity, EntityComponents, Sensor, SourceEntry } from '@me/schema';
 import { useClient, useEngineTime } from '@me/map-react';
-import { Facts } from './Facts.tsx';
+import { Review } from './Review.tsx';
 import { Pick } from './AlertRules.tsx';
 import { raidLabel } from './format.ts';
 
@@ -78,6 +78,7 @@ export function SourceEntryModal({ isOpen, sourceId, onClose }: { isOpen: boolea
     setKm('');
     setCarries('tracks');
     setNote('');
+    setBusy(false);
     setError(null);
   }, [isOpen]);
 
@@ -131,18 +132,21 @@ export function SourceEntryModal({ isOpen, sourceId, onClose }: { isOpen: boolea
     const src = existing.source_entry;
     return (
       <Modal isOpen={isOpen} onDismiss={onClose} size="sm" accessibilityLabel="Registered source">
-        <ModalHeader title={existing.aliases?.name ?? existing.entity_id} subtitle={`Registered source · set by ${existing.geo_details?.author ?? '—'} at ${raidLabel(existing.ingest_time, clock)}`} />
+        <ModalHeader title={existing.aliases?.name ?? existing.entity_id} subtitle="Registered source" />
         <ModalBody>
-          <Facts
-            items={[
-              ['Source', sourceSummary(src), 'wide'],
-              ['State', <Badge size="Small" color="Neutral" emphasis="Subtle" label="PLANNED" />],
+          <Review
+            lead={sourceSummary(src)}
+            state={<Badge size="Small" color="Neutral" emphasis="Subtle" label="PLANNED" />}
+            facts={[
+              ['Set by', existing.geo_details?.author ?? '—'],
+              ['Set at', raidLabel(existing.ingest_time, clock)],
               ['Label', <Badge size="Small" color="Notice" emphasis="Subtle" label={existing.label} />],
               !!existing.geo_details?.note && ['Note', existing.geo_details.note, 'wide'],
               ['Permission', existing.releasability?.join(' · ') ?? '—', 'wide'],
             ]}
+            note="Withdrawing takes it off the sources list from now on; the record keeps it."
           />
-          {error ? <p className="BodySmallRegular bs-muted">{error}</p> : null}
+          {error ? <p role="alert" className="BodySmallRegular bs-ink-negative">{error}</p> : null}
         </ModalBody>
         <ModalFooter>
           <Button size="sm" variant="secondary" tone="neutral" onClick={onClose}>
@@ -176,7 +180,7 @@ export function SourceEntryModal({ isOpen, sourceId, onClose }: { isOpen: boolea
           <div className="bs-form__wide">
             <TextInput label="Note" value={note} onChange={({ value }) => setNote(value ?? '')} placeholder="Owner, link or when it is expected" maxCharacters={80} />
           </div>
-          {error && name.trim() ? <p className="BodySmallRegular bs-muted bs-form__wide">{error}</p> : null}
+          {error && name.trim() ? <p role="alert" className="BodySmallRegular bs-ink-negative bs-form__wide">{error}</p> : null}
         </div>
       </ModalBody>
       <ModalFooter>

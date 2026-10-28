@@ -121,7 +121,9 @@ export class OperatorDesk {
       });
     }
     const [record] = this.append(drafts);
-    if (!withdraw && payload.geo_details?.type === 'geofence') void this.runGeofence(record!);
+    // A geofence saved again with only its colour changed has the same rule: its firings stand.
+    const sameRule = existing?.geo_details?.type === 'geofence' && JSON.stringify(existing.geo_shape) === JSON.stringify(payload.geo_shape) && existing.geo_details.watch === payload.geo_details?.watch;
+    if (!withdraw && payload.geo_details?.type === 'geofence' && !sameRule) void this.runGeofence(record!);
     if (!withdraw && payload.geo_details?.type === 'alert') void this.runAlert(record!);
     return record!;
   }

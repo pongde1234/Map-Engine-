@@ -25,6 +25,8 @@ export interface MapEngineOptions {
   basemap: BasemapOptions;
   center?: [number, number];
   zoom?: number;
+  pitch?: number;
+  bearing?: number;
   maxBounds?: [[number, number], [number, number]];
 }
 
@@ -84,6 +86,8 @@ export function createMapEngine(o: MapEngineOptions): MapEngine {
     style,
     center: o.center ?? [69.86, 22.36],
     zoom: o.zoom ?? 7,
+    pitch: o.pitch ?? 0,
+    bearing: o.bearing ?? 0,
     maxBounds: o.maxBounds,
     attributionControl: { compact: true },
     maxPitch: 70,
@@ -110,7 +114,7 @@ export function createMapEngine(o: MapEngineOptions): MapEngine {
   const { client, view } = o;
 
   // Caches keyed by entity version.
-  const areas = new Map<string, { version: number; item: AreaItem | null }>();
+  const areas = new Map<string, { version: number; item: AreaItem | null; layerLive: boolean }>();
   const templates = new Map<string, TrackTemplate>();
   let lastEntitiesVersion = -1;
   let dirty = true;
@@ -145,6 +149,12 @@ export function createMapEngine(o: MapEngineOptions): MapEngine {
     pendingCursor = [e.lngLat.lng, e.lngLat.lat];
   });
   map.on('move', () => (dirty = true));
+  // Where the operator left the map is kept in the view store, so leaving the view and coming back
+  // (or opening an object from another view) does not start again from the default camera.
+  map.on('moveend', () => {
+    const c = map.getCenter();
+    view.set({ camera: { center: [c.lng, c.lat], zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() } });
+  });
 
   const unsubClient = client.subscribe(() => (dirty = true));
   const unsubView = view.subscribe(() => (dirty = true));
@@ -155,7 +165,10 @@ export function createMapEngine(o: MapEngineOptions): MapEngine {
     style = buildStyle(theme, basemap);
     beforeId = firstSymbolLayerId(style);
     map.setStyle(style);
+    // The areas are coloured from the theme: rebuild them on the next frame, not only when an
+    // entity next changes (the picture can be paused).
     areas.clear();
+    lastEntitiesVersion = -1;
     dirty = true;
   });
 
@@ -167,10 +180,13 @@ export function createMapEngine(o: MapEngineOptions): MapEngine {
       if (e.geo_details?.ring === 'R3' && e.geo_shape?.type === 'circle') r3 = { center: e.geo_shape.center, radius_m: e.geo_shape.radius_m };
       if (key.startsWith('command') || key === 'reference.vp' || key === 'observation.fragments' || key === 'fused.groups') {
         const cached = areas.get(e.entity_id);
-        if (!cached || cached.version !== e.version) {
-          const item = areaFor(e, key, theme);
+        // An operator object takes its layer's colour while that layer exists; withdrawing the
+        // layer changes the object's colour without a new version of the object.
+        const layerLive = !!(e.geo_details?.layer && client.entities.has(e.geo_details.layer));
+        if (!cached || cached.version !== e.version || cached.layerLive !== layerLive) {
+          const item = areaFor(e, key, theme, layerLive);
           if (item && e.geo_details?.layer) item.layer = e.geo_details.layer;
-          areas.set(e.entity_id, { version: e.version, item });
+          areas.set(e.entity_id, { version: e.version, item, layerLive });
         }
       }
       if (!e.mil_view || !e.location) continue;

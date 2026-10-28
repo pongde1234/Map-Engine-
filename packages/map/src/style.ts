@@ -82,8 +82,9 @@ export function buildStyle(theme: MapTheme, o: BasemapOptions): StyleSpecificati
 
 /** Basemap labels the picture does not need: they compete with the overlay. */
 const QUIET_DROP = new Set(['places_subplace', 'pois', 'roads_labels_minor', 'roads_shields', 'earth_label_islands', 'water_waterway_label']);
-/** Basemap text runs this much smaller than Protomaps' defaults. */
-const LABEL_SCALE = 0.85;
+/** Basemap text keeps Protomaps' sizes, but none is set smaller than LABEL_MIN px: below it a place name cannot be read. */
+const LABEL_SCALE = 1;
+const LABEL_MIN = 10;
 
 /** One script per label, smaller text, and fewer towns until the operator zooms in. */
 function quietLabels(l: LayerSpecification): LayerSpecification {
@@ -105,7 +106,7 @@ function quietLabels(l: LayerSpecification): LayerSpecification {
 
 /** Scales the outputs of a numeric size expression (number, interpolate, step or case). */
 function scaleSize(v: unknown, k: number): unknown {
-  if (typeof v === 'number') return Math.round(v * k * 10) / 10;
+  if (typeof v === 'number') return Math.max(LABEL_MIN, Math.round(v * k * 10) / 10);
   if (!Array.isArray(v)) return v;
   const [op] = v;
   // [interpolate, type, input, stop, out, stop, out…]

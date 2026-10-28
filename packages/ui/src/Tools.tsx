@@ -25,10 +25,11 @@ import {
   useToast,
 } from '@faclon-labs/fds';
 import { RotateCcw, X } from 'lucide-react';
-import type { DrawState, ToolKind } from '@me/map';
-import type { EntityComponents, GeoType, GeofenceWatch, LonLat } from '@me/schema';
+import { defaultTone, toneColor, type DrawState, type ToolKind } from '@me/map';
+import type { EntityComponents, GeoType, GeofenceWatch, LonLat, OperatorColor } from '@me/schema';
 import { destination, formatArea, formatBearing, formatDistance, formatMgrs } from '@me/geo';
 import { useClient, useDrawState, useEngine, useEngineTime, useViewStore } from '@me/map-react';
+import { ColorPicker } from './ColorPicker.tsx';
 import { Facts } from './Facts.tsx';
 import { Pick } from './AlertRules.tsx';
 import { operatorLayers } from './OperatorLayers.tsx';
@@ -181,6 +182,8 @@ export function PromoteModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   const [note, setNote] = useState('');
   // The operator layer it goes in; 'none' keeps it in "Operator objects".
   const [layer, setLayer] = useState('none');
+  // The colour the operator chose on the map; none leaves it to the console.
+  const [color, setColor] = useState<OperatorColor | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const opLayers = operatorLayers(client.entities.values());
@@ -194,18 +197,29 @@ export function PromoteModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     setWatch('hostile');
     setNote('');
     setLayer('none');
+    setColor(undefined);
+    setBusy(false);
+    setAsking(false);
     setError(null);
     // Reset only when the dialog opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   const shape = tools?.geometry() ?? null;
+  // The colour it will take on the map: its layer's, or its type's.
+  const inLayer = layer !== 'none' && client.entities.has(layer);
+  const defaultColor = toneColor(defaultTone({ type, ...(inLayer ? { layer } : {}) }, inLayer));
   const who = client.identity;
   const clock = client.scenario?.clock;
   const discard = () => {
     tools?.cancel();
+    setAsking(false);
     onClose();
   };
+  // Leaving by Esc, the backdrop or Cancel throws the drawing away; once the operator has named or
+  // noted it, that is asked first, so a stray click does not lose their work.
+  const [asking, setAsking] = useState(false);
+  const leave = () => (name.trim() || note.trim() ? setAsking(true) : discard());
   const redraw = () => {
     tools?.restart();
     onClose();
@@ -227,6 +241,8 @@ export function PromoteModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         ...(type === 'geofence' ? { watch } : {}),
         ...(note.trim() ? { note: note.trim() } : {}),
         ...(layer !== 'none' && client.entities.has(layer) ? { layer } : {}),
+        // Only a colour the operator chose is recorded; otherwise the console picks.
+        ...(color ? { color } : {}),
       },
     };
     try {
@@ -249,7 +265,8 @@ export function PromoteModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   };
 
   return (
-    <Modal isOpen={isOpen && !!tool} onDismiss={discard} size="md" accessibilityLabel="Promote to command object">
+    <>
+    <Modal isOpen={isOpen && !!tool && !asking} onDismiss={leave} size="md" accessibilityLabel="Promote to command object">
       <ModalHeader title="Promote to command object" subtitle={`Recorded as ${who?.display ?? 'you'} at ${raidLabel(t, clock)}`} />
       <ModalBody>
         <div className="bs-form">
@@ -266,9 +283,16 @@ export function PromoteModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
           <div className="bs-form__wide">
           <Facts flush items={[['Shape', sketchReadout(s, measure)]]} />
           </div>
+          <div className="bs-form__wide bs-stack bs-stack--tight">
+            <span className="BodySmallRegular bs-muted">Colour on the map</span>
+            <ColorPicker value={color ?? defaultColor} isDefault={!color} onChange={setColor} onReset={() => setColor(undefined)} />
+          </div>
         </div>
       </ModalBody>
       <ModalFooter>
+        <Button size="sm" variant="ghost" tone="neutral" onClick={leave}>
+          Cancel
+        </Button>
         <Button size="sm" variant="secondary" tone="neutral" leadingIcon={<RotateCcw size={14} />} onClick={redraw}>
           Redraw
         </Button>
@@ -277,5 +301,20 @@ export function PromoteModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         </Button>
       </ModalFooter>
     </Modal>
+    <Modal isOpen={isOpen && !!tool && asking} onDismiss={() => setAsking(false)} size="sm" accessibilityLabel="Discard the drawing">
+      <ModalHeader title="Discard the drawing?" />
+      <ModalBody>
+        <p className="BodyMediumRegular">The shape and what you typed are not kept.</p>
+      </ModalBody>
+      <ModalFooter>
+        <Button size="sm" variant="secondary" tone="neutral" onClick={() => setAsking(false)}>
+          Keep editing
+        </Button>
+        <Button size="sm" variant="primary" tone="negative" onClick={discard}>
+          Discard
+        </Button>
+      </ModalFooter>
+    </Modal>
+    </>
   );
 }

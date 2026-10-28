@@ -65,6 +65,8 @@ function retire(ws: WebSocket | null): void {
   else ws.close();
 }
 
+const OFFLINE = 'Not connected to the engine.';
+
 export class MapClient {
   conn: ConnState = 'closed';
   scenario: ScenarioInfo | null = null;
@@ -79,7 +81,7 @@ export class MapClient {
   private idxToId: string[] = [];
   private ws: WebSocket | null = null;
   private reqId = 0;
-  private pending = new Map<number, (records: JournalRecord[]) => void>();
+  private pending = new Map<number, { resolve: (records: JournalRecord[]) => void; reject: (e: Error) => void }>();
   private publishing = new Map<number, { resolve: (r: JournalRecord) => void; reject: (e: Error) => void }>();
   private listeners = new Set<() => void>();
   private notifyScheduled = false;
@@ -142,11 +144,44 @@ export class MapClient {
   }
   private pendingSeek: number | undefined;
 
-  private send(m: ClientMessage): void {
-    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(encode(m) as Uint8Array<ArrayBuffer>);
+  private isOpen(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
   }
 
+  private send(m: ClientMessage): void {
+    if (this.isOpen()) this.ws!.send(encode(m) as Uint8Array<ArrayBuffer>);
+  }
+
+  /** A command the engine cannot get (the link is down): said aloud, not dropped silently. */
+  private command(m: ClientMessage, what: string): void {
+    if (this.isOpen()) this.send(m);
+    else for (const f of this.droppedListeners) f(what);
+  }
+  private droppedListeners = new Set<(what: string) => void>();
+  /** Told when a time command (seek, play, pause, live) was not sent because the engine is not connected. */
+  onDropped(f: (what: string) => void): () => void {
+    this.droppedListeners.add(f);
+    return () => this.droppedListeners.delete(f);
+  }
+
+  /** Every request still waiting for an answer fails when the link drops, so nothing waits for ever. */
+  private failPending(): void {
+    const err = new Error(OFFLINE);
+    for (const p of this.pending.values()) p.reject(err);
+    for (const p of this.publishing.values()) p.reject(err);
+    this.pending.clear();
+    this.publishing.clear();
+  }
+
+  /** When the link was lost (wall clock), and the picture time it held at: set while down, after it had been up. */
+  lost: { at: number; t: number } | null = null;
+
   private setConn(c: ConnState): void {
+    if (c !== 'open' && this.conn === 'open') {
+      // The picture time stops where it was: it must not run on with no data.
+      this.lost = { at: Date.now(), t: this.now() };
+      this.failPending();
+    } else if (c === 'open') this.lost = null;
     this.conn = c;
     this.bump('conn');
   }
@@ -154,28 +189,30 @@ export class MapClient {
   // ------------------------------------------------------------- commands
 
   seek(t: number): void {
-    this.send({ type: 'seek', t: Math.round(t) });
+    this.command({ type: 'seek', t: Math.round(t) }, 'Go to time');
   }
   play(rate = this.clock.rate || 1): void {
-    this.send({ type: 'play', rate });
+    this.command({ type: 'play', rate }, 'Play');
   }
   pause(): void {
-    this.send({ type: 'pause' });
+    this.command({ type: 'pause' }, 'Pause');
   }
   live(): void {
-    this.send({ type: 'live' });
+    this.command({ type: 'live' }, 'Go live');
   }
 
   lineage(id: string): Promise<JournalRecord[]> {
     const reqId = ++this.reqId;
+    if (!this.isOpen()) return Promise.reject(new Error(OFFLINE));
     this.send({ type: 'lineage', reqId, id });
-    return new Promise((res) => this.pending.set(reqId, res));
+    return new Promise((resolve, reject) => this.pending.set(reqId, { resolve, reject }));
   }
 
   records(ids: string[]): Promise<JournalRecord[]> {
     const reqId = ++this.reqId;
+    if (!this.isOpen()) return Promise.reject(new Error(OFFLINE));
     this.send({ type: 'records', reqId, ids });
-    return new Promise((res) => this.pending.set(reqId, res));
+    return new Promise((resolve, reject) => this.pending.set(reqId, { resolve, reject }));
   }
 
   /**
@@ -184,7 +221,7 @@ export class MapClient {
    * arrives through the normal picture updates.
    */
   publish(draft: OperatorDraft): Promise<JournalRecord> {
-    if (this.ws?.readyState !== WebSocket.OPEN) return Promise.reject(new Error('Not connected to the engine.'));
+    if (!this.isOpen()) return Promise.reject(new Error(OFFLINE));
     const reqId = ++this.reqId;
     this.send({ type: 'publish', reqId, draft });
     return new Promise((resolve, reject) => this.publishing.set(reqId, { resolve, reject }));
@@ -195,6 +232,7 @@ export class MapClient {
   /** Engine time now (ingest axis), extrapolated between clock messages. */
   now(): number {
     const c = this.clock;
+    if (this.lost) return this.lost.t;
     if (!c.playing || !this.clockRecvAt) return c.t;
     const t = c.t + (performance.now() - this.clockRecvAt) * c.rate;
     return this.scenario ? Math.min(this.scenario.t1, Math.max(this.scenario.t0, t)) : t;
@@ -321,7 +359,7 @@ export class MapClient {
       case 'records': {
         const res = this.pending.get(m.reqId);
         this.pending.delete(m.reqId);
-        res?.(m.records);
+        res?.resolve(m.records);
         break;
       }
       case 'published': {

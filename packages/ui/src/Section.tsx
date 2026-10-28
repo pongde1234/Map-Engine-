@@ -13,7 +13,7 @@ export function Section({ title, count, trailing, children }: { title: string; c
       <div className="bs-sec__head">
         <span className="bs-sec__title">
           <span className="BodyMediumSemibold">{title}</span>
-          {count !== undefined ? <Counter value={count} max={999} size="Small" color="Neutral" emphasis="Subtle" accessibilityLabel={`${count}`} /> : null}
+          {count !== undefined ? <Counter value={count} max={999} size="Medium" color="Neutral" emphasis="Subtle" accessibilityLabel={`${count}`} /> : null}
         </span>
         {trailing}
       </div>

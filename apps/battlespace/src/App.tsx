@@ -1,10 +1,12 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
-import { AppShell, TabItem, TabList, TabPanel, Tabs, ThemeProvider, ToastContainer } from '@faclon-labs/fds';
+import { AppShell, Badge, TabItem, TabList, TabPanel, Tabs, ThemeProvider, ToastContainer } from '@faclon-labs/fds';
 import { Crosshair, Map as MapIcon, Network } from 'lucide-react';
 import { MapClient, createViewStore, syncAcrossWindows } from '@me/client';
 import { MapEngineProvider, useClient, useViewStore } from '@me/map-react';
-import { useDerived } from '@me/ui';
+import { ConnectionBanner, IconTitles, useDerived } from '@me/ui';
 import { BattlespacePage, type PanelState } from './BattlespacePage.tsx';
+import { DroppedCommands } from './DroppedCommands.tsx';
+import { fitPanels } from './panels.ts';
 import { ShellActions } from './ShellActions.tsx';
 import { TargetsPage } from './TargetsPage.tsx';
 import { OntologyPage } from './OntologyPage.tsx';
@@ -55,13 +57,18 @@ function Console() {
   const client = useClient();
   const view = useViewStore();
   const [page, setPage] = useState('battlespace');
-  const [panels, setPanelState] = useState<PanelState>({ leftOpen: true, leftTab: 'layers', rightOpen: true });
+  const [panels, setPanelState] = useState<PanelState>(() => fitPanels<PanelState>({ leftOpen: true, leftTab: 'layers', rightOpen: true }, {}, window.innerWidth));
   // The assistant docks beside the open view; it loads on first open and then stays mounted, so
   // its conversation survives closing it and switching views.
   const [assistant, setAssistant] = useState({ open: false, loaded: false });
   // A question handed to the assistant from a view.
   const [pendingAsk, setPendingAsk] = useState<string | null>(null);
-  const setPanels = useCallback((p: Partial<PanelState>) => setPanelState((s) => ({ ...s, ...p })), []);
+  const setPanels = useCallback((p: Partial<PanelState>) => setPanelState((s) => fitPanels(s, p, window.innerWidth)), []);
+  useEffect(() => {
+    const onResize = () => setPanelState((s) => fitPanels(s, {}, window.innerWidth));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   // Below 1600 px the docked assistant would leave the map too narrow: the layers panel steps
   // aside while it is open and comes back when it closes (unless the operator moved it meanwhile).
   const stepAside = useRef(false);
@@ -82,7 +89,8 @@ function Console() {
   // Storyboard frames step from any view; a frame opens its own view (A2: Ontology).
   const presenter = usePresenter(client, view, setPage);
   const openOnMap = (id: string | null, highlight?: string[]) => {
-    view.set({ selected: id, highlight: highlight ?? [] });
+    // The map takes the id and flies there once it is on screen (it may not be mounted yet).
+    view.set({ selected: id, highlight: highlight ?? [], locate: id });
     setPage('battlespace');
   };
   const ask = (q: string) => {
@@ -143,11 +151,19 @@ function Console() {
           </Suspense>
         ) : null
       }
-      actions={<ShellActions />}
+      actions={
+        <>
+          {presenter.mode ? <Badge size="Medium" color="Information" emphasis="Subtle" label="PRESENTER" /> : null}
+          <ShellActions onOpenOnMap={(id) => openOnMap(id)} />
+          <IconTitles />
+          <DroppedCommands />
+        </>
+      }
       pagePadding="none"
       pageHeight="fill"
     >
       <Tabs className="bs-tabs-fill console" value={page} onChange={setPage} size="Small" variant="borderless">
+        <ConnectionBanner />
         <div className="console__tabs">
           <TabList>
             {VIEWS.map((v) => (

@@ -92,7 +92,7 @@ export function AssistantPanel({
       isOpen={isOpen}
       onDismiss={onDismiss}
       title="Bruce"
-      subtitle="Adapter stub · read-only · assist only"
+      subtitle="Read-only assistant"
       accessibilityLabel="Assistant"
       {...(msgs.length ? { onNewChat: () => (stop(), setMsgs([])) } : {})}
       footer={<AiComposer onSubmit={({ text }) => ask(text)} onStop={stop} status={status} value={draft} onChange={setDraft} placeholder={preview ?? PLACEHOLDER} accessibilityLabel="Ask the assistant" />}
@@ -115,7 +115,7 @@ export function AssistantPanel({
                         {id}
                       </Button>
                     ))}
-                    <span className="BodyXSmallRegular bs-muted bs-num">
+                    <span className="BodySmallRegular bs-muted bs-num">
                       Picture as of {clock ? raidLabel(m.answer.asOf, clock) : ''} · {formatZulu(m.answer.asOf).slice(0, 5)}Z{health ? ` · journal ${health.records.toLocaleString('en')} records · root ${shortHash(health.head.hash)}` : ''}
                     </span>
                   </div>

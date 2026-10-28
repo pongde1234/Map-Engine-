@@ -41,6 +41,8 @@ export interface Derived {
   contested: number;
   stale: number;
   rings: Record<'R4' | 'R3' | 'R2' | 'R1', number>;
+  /** Of those, the tracks closing on the defended point (velocity toward it, over 1 m/s). */
+  closing: Record<'R4' | 'R3' | 'R2' | 'R1', number>;
   groups: Entity[];
   effectors: Entity[];
   activeRules: Array<JournalRecord<RuleFirePayload>>;
@@ -55,6 +57,7 @@ export function computeDerived(client: MapClient, t: number): Derived {
   const bySource = new Map<string, SourceStat>();
   let tracks = 0;
   const rings = { R4: 0, R3: 0, R2: 0, R1: 0 };
+  const closing = { R4: 0, R3: 0, R2: 0, R1: 0 };
   const groups: Entity[] = [];
   const effectors: Entity[] = [];
   let hostile = 0;
@@ -89,12 +92,16 @@ export function computeDerived(client: MapClient, t: number): Derived {
     if (key.startsWith('fused') && (age === 'stale' || age === 'disc')) stale++;
     if (isThreat(e) && e.location && e.track?.state !== 'destroyed') {
       hostile++;
-      const { distance_m } = inverse(center, [e.location.lon, e.location.lat]);
+      const { distance_m, azimuth_deg } = inverse(center, [e.location.lon, e.location.lat]);
       const km = distance_m / 1000;
-      if (km < 5) rings.R1++;
-      else if (km < 20) rings.R2++;
-      else if (km < 60) rings.R3++;
-      else if (km < 150) rings.R4++;
+      const ring = km < 5 ? 'R1' : km < 20 ? 'R2' : km < 60 ? 'R3' : km < 150 ? 'R4' : null;
+      if (ring) {
+        rings[ring]++;
+        // Speed away from the defended point along the line to it; negative is closing.
+        const az = (azimuth_deg * Math.PI) / 180;
+        const v = e.location.vel;
+        if (v && v.e * Math.sin(az) + v.n * Math.cos(az) < -1) closing[ring]++;
+      }
     }
   }
   // Rules currently fired (last state per rule id).
@@ -104,7 +111,7 @@ export function computeDerived(client: MapClient, t: number): Derived {
   groups.sort((a, b) => (b.group?.members.length ?? 0) - (a.group?.members.length ?? 0));
   effectors.sort((a, b) => (a.ontology?.class ?? '').localeCompare(b.ontology?.class ?? ''));
   const sources = [...bySource.values()].sort((a, b) => b.count - a.count);
-  return { t, byKey, sources, tracks, hostile, contested, stale, rings, groups, effectors, activeRules, center };
+  return { t, byKey, sources, tracks, hostile, contested, stale, rings, closing, groups, effectors, activeRules, center };
 }
 
 export function useDerived(ms = 250): Derived {

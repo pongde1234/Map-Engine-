@@ -10,6 +10,14 @@
   color: var(--text-neutral-muted);
   border-color: var(--border-neutral-default);
 }
+/* MapLibre's own DOM cannot take an FDS type class, so its chrome uses the type tokens a
+   BodySmallRegular is made of: Inter at 12px, not MapLibre's Helvetica at 10px. */
+.me-map .maplibregl-ctrl-attrib,
+.me-map .maplibregl-ctrl-scale {
+  font-family: var(--font-family);
+  font-size: var(--font-size-75);
+  line-height: var(--line-height-75);
+}
 .me-map .maplibregl-ctrl-attrib a {
   color: var(--text-neutral-muted);
 }

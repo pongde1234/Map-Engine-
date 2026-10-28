@@ -76,22 +76,22 @@ body {
   scroll-padding-inline: var(--spacing-12);
 }
 /* One 12px measure: the board's gutter, the gap between columns and the columns' own padding. */
-/* As wide as its columns (never narrower than the board), so the 12px padding on the right is
-   part of the scroll and the last column keeps its gutter when scrolled to the end. */
+/* The columns share the board's width, so every stage is in view at once. Only when they cannot
+   keep their least width (.tb__col) does the board scroll sideways, on whole columns. */
 .tb__cols {
   display: flex;
   gap: var(--spacing-12);
-  width: max-content;
+  width: 100%;
   min-width: 100%;
   height: 100%;
   padding: var(--spacing-12);
   box-sizing: border-box;
 }
 .tb__col {
-  /* 256px columns, so a card's title and its line of facts read in full; the board scrolls
-     sideways when they do not all fit, and spare width on a wide screen is shared out. */
-  flex: 1 0 calc(var(--spacing-64) * 4);
-  min-width: 0;
+  /* Equal columns that share the board; 144px is the least a card's title (two lines) and its
+     line of facts can have. */
+  flex: 1 1 0;
+  min-width: calc(var(--spacing-64) * 2 + var(--spacing-16));
   scroll-snap-align: start;
   display: flex;
   flex-direction: column;
@@ -161,9 +161,10 @@ body {
 .tb-card__head,
 .tb-check__head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--spacing-8);
+  gap: var(--spacing-4) var(--spacing-8);
 }
 .tb-card__title {
   overflow: hidden;
@@ -171,10 +172,17 @@ body {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
+/* The card's last line (where it stands next): two lines, so a narrow column still says it. */
+.tb-card__note {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
 .tb-card__checks {
-  /* The three gates in one row, aligned card to card. */
-  display: grid;
-  grid-template-columns: repeat(3, max-content);
+  /* The gates in a row, wrapping when the column is narrow. */
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--spacing-4);
 }
 /* EmptyState brings no padding of its own: the panel's 24px block and 16px inline. */

@@ -6,10 +6,10 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActionList, ActionListItem, ActionListItemIcon, ActionListItemText, ActionListSection, Button, Card, Counter, DropdownMenu, DropdownMenuOverlay, DropdownMenuTrigger, TabItem, TabList, TabPanel, Tabs } from '@faclon-labs/fds';
-import { ChevronDown, Compass, Eye, LocateFixed, Maximize, PanelLeft, PanelRight, PencilLine, Ruler, Shapes } from 'lucide-react';
+import { ChevronDown, Compass, Eye, LocateFixed, Maximize, PanelLeft, PanelRight, PencilLine, Presentation, Ruler, Shapes } from 'lucide-react';
 import type { Bookmark } from '@me/client';
-import { MapView, useClient, useDrawState, useEngine, useViewStore } from '@me/map-react';
-import { CursorReadout, DEFAULT_SHAPE, EventFeed, Inspector, LayerList, MeasurePopover, PromoteModal, SourceList, StatusBadges, TimeBar, ToolMenu, toolValue, type Derived, type InspectorHandover } from '@me/ui';
+import { MapView, useClient, useDrawState, useEngine, useView, useViewStore } from '@me/map-react';
+import { CursorReadout, DEFAULT_SHAPE, entityCenter, EventFeed, Inspector, LayerList, MeasurePopover, PromoteModal, SourceList, StatusBadges, TimeBar, ToolMenu, shortcutBlocked, toolValue, type Derived, type InspectorHandover } from '@me/ui';
 import type { SketchShape, ToolKind } from '@me/map';
 import type { Presenter } from './presenter.ts';
 
@@ -88,6 +88,18 @@ export function BattlespacePage({
   );
   const { bookmarks, go: goBookmark, pending, applied } = presenter;
 
+  // The camera the operator left (kept in the view store); none the first time.
+  const camera = view.get().camera;
+  // An object another view or a list asked to bring into view: the map flies to it, once.
+  const locate = useView((v) => v.locate);
+  useEffect(() => {
+    if (!locate || !engine) return;
+    const e = client.entities.get(locate);
+    const c = e ? entityCenter(e) : null;
+    if (c) engine.flyTo({ center: c, zoom: Math.max(engine.getCamera().zoom, 9) }, 900);
+    view.set({ locate: null });
+  }, [locate, engine, client, view]);
+
   // Frames are stepped by the console (presenter.ts); the camera applies here once the map exists.
   useEffect(() => {
     if (!pending || !engine) return;
@@ -97,8 +109,9 @@ export function BattlespacePage({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement;
-      if (el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable || e.ctrlKey || e.metaKey) return;
+      // A key a menu, dialog, field or pressed control owns is left alone; so is one already handled
+      // (the sketch cancelled by Escape, a menu closed by it): see shortcuts.ts.
+      if (shortcutBlocked(e)) return;
       // Enter, Backspace and Escape belong to the sketch while a tool is active.
       const sketching = !!engine?.tools.get().tool;
       if (e.key === ' ') {
@@ -106,7 +119,7 @@ export function BattlespacePage({
         if (client.clock.playing) client.pause();
         else client.play(client.clock.rate > 1 ? client.clock.rate : 60);
       } else if (e.key === 'Escape') {
-        if (!sketching && !document.querySelector('[role="dialog"]')) view.set({ selected: null, highlight: [] });
+        if (!sketching) view.set({ selected: null, highlight: [] });
       } else if (e.key === 'l' || e.key === 'L') setPanels({ leftOpen: !panels.leftOpen });
       else if (e.key === 'i' || e.key === 'I') setPanels({ rightOpen: !panels.rightOpen });
       else if (e.key === 'd' || e.key === 'D') startTool('draw');
@@ -129,7 +142,7 @@ export function BattlespacePage({
             <div className="bs-tabbar">
               <TabList>
                 <TabItem value="layers">Layers</TabItem>
-                <TabItem value="alerts" trailing={<Counter value={client.events.length} max={999} size="Small" color="Neutral" emphasis="Subtle" accessibilityLabel={`${client.events.length} alerts and events received`} />}>
+                <TabItem value="alerts" trailing={<Counter value={client.events.length} max={999} size="Medium" color="Neutral" emphasis="Subtle" accessibilityLabel={`${client.events.length} alerts and events received`} />}>
                   Alerts
                 </TabItem>
                 <TabItem value="sources">Sources</TabItem>
@@ -153,8 +166,9 @@ export function BattlespacePage({
           {s ? (
             <MapView
               basemap={{ pmtiles: '/tiles/basemap.pmtiles', glyphs: '/tiles/fonts/{fontstack}/{range}.pbf', sprite: '/tiles/sprites/v4/dark' }}
-              center={s.center}
-              zoom={s.zoom}
+              center={camera?.center ?? s.center}
+              zoom={camera?.zoom ?? s.zoom}
+              {...(camera ? { pitch: camera.pitch, bearing: camera.bearing } : {})}
               maxBounds={[
                 [58, 14],
                 [80, 32],
@@ -200,6 +214,9 @@ export function BattlespacePage({
                     <ActionListSection>
                       <ActionListItem value="layers" title={panels.leftOpen ? 'Hide layers panel' : 'Show layers panel'} leading={<ActionListItemIcon icon={PanelLeft} />} trailing={<ActionListItemText>L</ActionListItemText>} onClick={() => setPanels({ leftOpen: !panels.leftOpen })} />
                       <ActionListItem value="inspector" title={panels.rightOpen ? 'Hide inspector' : 'Show inspector'} leading={<ActionListItemIcon icon={PanelRight} />} trailing={<ActionListItemText>I</ActionListItemText>} onClick={() => setPanels({ rightOpen: !panels.rightOpen })} />
+                    </ActionListSection>
+                    <ActionListSection>
+                      <ActionListItem value="presenter" title={presenter.mode ? 'Presenter mode: on' : 'Presenter mode: off'} description="[ ] and PgUp/PgDn step the storyboard frames" leading={<ActionListItemIcon icon={Presentation} />} onClick={() => presenter.setMode(!presenter.mode)} />
                     </ActionListSection>
                   </ActionList>
                 </DropdownMenuOverlay>

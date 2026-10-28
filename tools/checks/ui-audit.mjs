@@ -3,6 +3,7 @@
 // text clipped without an ellipsis, HUD overlap, broken images, console errors and FDS dev
 // warnings, failed requests and any request to a non-local origin (air-gap check).
 //   node tools/checks/ui-audit.mjs <width> <height> <dark|light> [--bookmarks]
+// The frame keys ([ ] PgUp PgDn) work in presenter mode, so every page load carries ?presenter.
 // AUDIT_BASE points it at another dev server (default http://localhost:5173/).
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -197,7 +198,7 @@ const viewItem = async (name) => {
 };
 
 await step('load', async () => {
-  await page.goto(`${base}?bm=B4`, { waitUntil: 'networkidle' });
+  await page.goto(`${base}?presenter&bm=B4`, { waitUntil: 'networkidle' });
   await wait(4000);
   await openView('Battlespace');
   await wait(3000);
@@ -330,10 +331,23 @@ await step('entity-overview-scrolled', async () => {
   await page.locator('.bs-right .bs-scroll__viewport, .bs-right .ds-scroll__viewport').first().evaluate((el) => el.scrollTo(0, el.scrollHeight));
   await wait(500);
 });
-// Frames live in the timeline: a menu in the transport, and the [ and ] keys.
-await step('frames-menu', async () => {
-  await page.getByRole('button', { name: 'Storyboard frames' }).click();
-  await wait(600);
+// Frames live on the timeline: ticks from the track's top edge (click to go), and the [ and ] keys.
+// B1 (the sixth frame) stays on this view; the picture time's label names it.
+await step('frame-tick', async () => {
+  await page.locator('.bs-tl__frame').nth(5).dispatchEvent('pointerdown');
+  await wait(2500);
+  const named = await page.locator('.bs-tl__readout').getAttribute('aria-label');
+  if (!/B1/.test(named)) throw new Error(`frame tick did not go to B1 (readout "${named}")`);
+});
+// Which kinds of event the track draws: the Show menu.
+await step('show-menu', async () => {
+  await page.getByRole('button', { name: /^Events shown/ }).click();
+  await wait(500);
+  await menuRow('Intel').click();
+  await wait(400);
+  const label = await page.getByRole('button', { name: /^Events shown/ }).innerText();
+  await menuRow('Intel').click();
+  if (!/2 of 3/.test(label)) throw new Error(`Show did not hide Intel (button "${label}")`);
 });
 await step('next-frame', async () => {
   await page.keyboard.press('Escape');
@@ -387,7 +401,7 @@ await step('slider-start', async () => {
   await wait(3000);
 });
 await step('replay-30', async () => {
-  await page.goto(`${base}?bm=B5`, { waitUntil: 'networkidle' });
+  await page.goto(`${base}?presenter&bm=B5`, { waitUntil: 'networkidle' });
   await wait(4000);
   await openView('Battlespace');
   await wait(2500);
@@ -520,7 +534,7 @@ await step('assistant-closed', async () => {
 
 // Ontology Explorer at frame A2 (the same D-3 snapshot as A1, its source record in focus).
 await step('nav-ontology', async () => {
-  await page.goto(`${base}?bm=A2`, { waitUntil: 'networkidle' });
+  await page.goto(`${base}?presenter&bm=A2`, { waitUntil: 'networkidle' });
   await wait(5000);
   if (!(await page.locator('.on').count())) throw new Error('ontology view missing');
   if ((await page.locator('.on-graph [data-node]').count()) < 6) throw new Error('lineage graph has too few nodes');
@@ -551,7 +565,7 @@ await step('ontology-view-as', async () => {
 if (withBookmarks) {
   for (const bm of ['P1', 'A1', 'A2', 'A3', 'A5', 'B1', 'B3', 'B4', 'B5', 'C1']) {
     await step(`bm-${bm}`, async () => {
-      await page.goto(`${base}?bm=${bm}`, { waitUntil: 'networkidle' });
+      await page.goto(`${base}?presenter&bm=${bm}`, { waitUntil: 'networkidle' });
       await wait(4500);
     });
   }

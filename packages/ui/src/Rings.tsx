@@ -1,54 +1,51 @@
 /**
- * Hostile tracks per ring, outer to inner: four Cards, each with the ring's name, the count and a
- * meter for its share of all tracked hostiles (the span is in the tooltip). R3 is read against its
- * fire channels (the saturation rule's own figure): its meter runs against them, and the count and
- * meter turn red when it passes them.
+ * Hostile tracks per ring, outer to inner, as metric tiles (Kpi.tsx): the ring and its name, the
+ * count large, and beneath it how many of those tracks are closing on the defended point, with
+ * the ring's span. R3 is read against its fire channels (the saturation rule's own figure): its
+ * count shows "of N channels" and turns red when it passes them. The icon's tint is the ring's
+ * state: quiet when clear, amber when occupied, red when R3 is over its channels.
  */
-import { Card, CardBody, Metric, ProgressBar, Tooltip } from '@faclon-labs/fds';
+import { Crosshair, Radar, ShieldAlert, Target, TrendingDown } from 'lucide-react';
 import type { Derived } from './derived.ts';
+import { KpiGrid, KpiTile, type KpiTone } from './Kpi.tsx';
 import { Section } from './Section.tsx';
 
-/** Rings, outer to inner, with their span. */
-const RINGS: Array<[keyof Derived['rings'], string]> = [
-  ['R4', '150–60 km'],
-  ['R3', '60–20 km'],
-  ['R2', '20–5 km'],
-  ['R1', '5–0 km'],
+type RingId = keyof Derived['rings'];
+
+/** Rings, outer to inner: name, span and icon. */
+const RINGS: Array<{ id: RingId; name: string; span: string; icon: typeof Radar }> = [
+  { id: 'R4', name: 'Outer', span: '150–60 km', icon: Radar },
+  { id: 'R3', name: 'Middle', span: '60–20 km', icon: Crosshair },
+  { id: 'R2', name: 'Keep-out', span: '20–5 km', icon: ShieldAlert },
+  { id: 'R1', name: 'Terminal', span: '5–0 km', icon: Target },
 ];
 
-export function Rings({ rings, channels }: { rings: Derived['rings']; channels: number }) {
-  const total = RINGS.reduce((a, [k]) => a + rings[k], 0);
+export function Rings({ rings, closing, channels }: { rings: Derived['rings']; closing: Derived['closing']; channels: number }) {
+  const total = RINGS.reduce((a, r) => a + rings[r.id], 0);
   return (
     <Section title="Rings · hostile tracks" count={total}>
-      <div className="bs-rings">
-        {RINGS.map(([k, span]) => {
-          const n = rings[k];
-          // R3 against its fire channels; the others against all hostile tracks in the rings.
-          const limit = k === 'R3' && channels > 0 ? channels : 0;
+      <KpiGrid label="Hostile tracks per ring">
+        {RINGS.map((r) => {
+          const n = rings[r.id];
+          const c = closing[r.id];
+          // R3 against its fire channels; the others are counted on their own.
+          const limit = r.id === 'R3' && channels > 0 ? channels : 0;
           const over = limit > 0 && n > limit;
-          const max = limit || total || 1;
+          const tone: KpiTone = over ? 'negative' : n > 0 ? 'notice' : 'neutral';
           return (
-            <Tooltip key={k} content={`${k} · ${span}${limit ? ` · ${limit} fire channels` : ''}`}>
-              <div className="bs-rings__item" tabIndex={0}>
-                <Card padding={0} size="Medium" accessibilityLabel={`${k}: ${n} hostile tracks`}>
-                  <CardBody>
-                    <div className="bs-rings__cell">
-                      <span className="bs-rings__name">
-                        <span className="BodyXSmallRegular bs-muted">{k}</span>
-                      </span>
-                      <span className="bs-rings__value">
-                        <Metric type="Heading" size="Small" weight="Semibold" value={n} suffix="none" color={over ? 'Negative' : 'Neutral'} />
-                        {limit ? <span className="BodyXSmallRegular bs-muted bs-num">/{limit}</span> : null}
-                      </span>
-                      <ProgressBar type="meter" size="Large" accessibilityLabel={over ? `${k} over its fire channels` : `${k} share`} value={Math.min(n, max)} max={max} color={over ? 'Negative' : n > 0 ? 'Notice' : 'Neutral'} />
-                    </div>
-                  </CardBody>
-                </Card>
-              </div>
-            </Tooltip>
+            <KpiTile
+              key={r.id}
+              label={`${r.id} · ${r.name}`}
+              icon={r.icon}
+              tone={tone}
+              value={n}
+              {...(limit ? { of: `of ${limit} channels` } : { unit: n === 1 ? 'track' : 'tracks' })}
+              {...(over ? { valueTone: 'negative' as const } : {})}
+              foot={{ icon: c ? TrendingDown : undefined, text: c ? `${c} closing` : 'none closing', tone: c ? 'negative' : 'neutral', note: r.span }}
+            />
           );
         })}
-      </div>
+      </KpiGrid>
     </Section>
   );
 }

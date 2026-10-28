@@ -1,10 +1,10 @@
 /**
- * Search (Modal + SearchInput + ActionList), opened with Ctrl/Cmd+K. The top bar carries no
- * search or profile icon; the view profile is set with ?role= in the URL.
+ * Search (Modal + SearchInput + ActionList): a button in the top bar, or Ctrl/Cmd+K. A result is
+ * brought into view on the map from any page. The view profile is set with ?role= in the URL.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { ActionList, ActionListItem, ActionListItemIcon, Modal, ModalBody, ModalHeader, SearchInput } from '@faclon-labs/fds';
-import { Crosshair, LocateFixed } from 'lucide-react';
+import { ActionList, ActionListItem, ActionListItemIcon, Button, Modal, ModalBody, ModalHeader, SearchInput, Tooltip } from '@faclon-labs/fds';
+import { Crosshair, LocateFixed, Search } from 'lucide-react';
 import { CLASSES, type Entity } from '@me/schema';
 import { formatMgrs, parseMgrs } from '@me/geo';
 import { useClient, useEngine, useViewStore } from '@me/map-react';
@@ -17,7 +17,10 @@ interface Hit {
   at?: [number, number];
 }
 
-export function ShellActions() {
+/** Results shown at most; the dialog says when there may be more. */
+const MAX_HITS = 12;
+
+export function ShellActions({ onOpenOnMap }: { onOpenOnMap: (id: string | null) => void }) {
   const client = useClient();
   const engine = useEngine();
   const view = useViewStore();
@@ -47,7 +50,7 @@ export function ShellActions() {
       const hay = [e.entity_id, e.aliases?.track_number, e.aliases?.name, e.aliases?.callsign, cls?.label, cls?.abbr].filter(Boolean).join(' ').toLowerCase();
       if (!hay.includes(query)) continue;
       out.push({ value: e.entity_id, title: e.aliases?.track_number ?? e.aliases?.name ?? e.entity_id, description: `${cls?.label ?? e.ontology?.class ?? ''} · ${e.layer}`, entity: e });
-      if (out.length >= 12) break;
+      if (out.length >= MAX_HITS) break;
     }
     return out;
     // Recomputed on each keystroke; entities are read at that moment.
@@ -56,15 +59,27 @@ export function ShellActions() {
 
   const go = (h: Hit | undefined) => {
     if (!h) return;
-    const center = h.at ?? (h.entity?.location ? ([h.entity.location.lon, h.entity.location.lat] as [number, number]) : undefined);
-    if (h.entity) view.set({ selected: h.entity.entity_id });
-    if (center && engine) engine.flyTo({ center, zoom: Math.max(engine.getCamera().zoom, 9) }, 900);
+    if (h.entity) onOpenOnMap(h.entity.entity_id);
+    else if (h.at) {
+      // A grid reference: the map goes there, on whichever page the search was opened from.
+      if (engine) engine.flyTo({ center: h.at, zoom: Math.max(engine.getCamera().zoom, 9) }, 900);
+      else {
+        view.set({ camera: { center: h.at, zoom: 9, pitch: 0, bearing: 0 } });
+        onOpenOnMap(null);
+      }
+    }
     setOpen(false);
     setQ('');
   };
+  const query = q.trim();
 
   return (
     <>
+      <Tooltip content="Search objects, units or a grid reference (Ctrl K)">
+        <Button size="sm" variant="secondary" tone="neutral" leadingIcon={<Search size={14} />} onClick={() => setOpen(true)}>
+          Search
+        </Button>
+      </Tooltip>
       <Modal isOpen={open} onDismiss={() => setOpen(false)} size="md" accessibilityLabel="Search">
         <ModalHeader title="Search" subtitle="Objects, units or an MGRS reference" />
         <ModalBody>
@@ -85,6 +100,10 @@ export function ShellActions() {
                 ))}
               </ActionList>
             ) : null}
+            {/* Nothing is silent: a short query, no match, and a list that may be cut all say so. */}
+            {query.length > 0 && query.length < 2 ? <span className="BodySmallRegular bs-muted">Type at least 2 characters.</span> : null}
+            {query.length >= 2 && !hits.length ? <span className="BodySmallRegular bs-muted">{`Nothing matches “${query}”. Try a track number, a name or an MGRS reference.`}</span> : null}
+            {hits.length >= MAX_HITS ? <span className="BodySmallRegular bs-muted">{`Showing the first ${MAX_HITS}. Type more to narrow them.`}</span> : null}
           </div>
         </ModalBody>
       </Modal>

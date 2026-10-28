@@ -120,7 +120,11 @@ export function useLineage(id: string | null): { records: JournalRecord[]; loadi
     }
     let live = true;
     setState((s) => ({ ...s, loading: true }));
-    client.lineage(id).then((records) => live && setState({ records, loading: false }));
+    // A dropped link ends the wait (the shell says the link is down); the list is then empty, not "Loading…".
+    client
+      .lineage(id)
+      .then((records) => live && setState({ records, loading: false }))
+      .catch(() => live && setState({ records: [], loading: false }));
     return () => {
       live = false;
     };
