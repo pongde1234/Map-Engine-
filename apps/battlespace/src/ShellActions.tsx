@@ -1,10 +1,10 @@
 /**
- * Search (Modal + SearchInput + ActionList): a button in the top bar, or Ctrl/Cmd+K. A result is
+ * Search (Modal + SearchInput + ActionList): Ctrl/Cmd+K, with no button in the top bar. A result is
  * brought into view on the map from any page. The view profile is set with ?role= in the URL.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { ActionList, ActionListItem, ActionListItemIcon, Button, Modal, ModalBody, ModalHeader, SearchInput, Tooltip } from '@faclon-labs/fds';
-import { Crosshair, LocateFixed, Search } from 'lucide-react';
+import { ActionList, ActionListItem, ActionListItemIcon, Modal, ModalBody, ModalHeader, SearchInput } from '@faclon-labs/fds';
+import { Crosshair, LocateFixed } from 'lucide-react';
 import { CLASSES, type Entity } from '@me/schema';
 import { formatMgrs, parseMgrs } from '@me/geo';
 import { useClient, useEngine, useViewStore } from '@me/map-react';
@@ -75,18 +75,13 @@ export function ShellActions({ onOpenOnMap }: { onOpenOnMap: (id: string | null)
 
   return (
     <>
-      <Tooltip content="Search objects, units or a grid reference (Ctrl K)">
-        <Button size="sm" variant="secondary" tone="neutral" leadingIcon={<Search size={14} />} onClick={() => setOpen(true)}>
-          Search
-        </Button>
-      </Tooltip>
       <Modal isOpen={open} onDismiss={() => setOpen(false)} size="md" accessibilityLabel="Search">
         <ModalHeader title="Search" subtitle="Objects, units or an MGRS reference" />
         <ModalBody>
           <div className="bs-stack">
             <SearchInput
               accessibilityLabel="Search objects, units, MGRS"
-              placeholder="Track number, name, class or MGRS"
+              placeholder="Search…"
               value={q}
               autoFocus
               onChange={({ value }) => setQ(value ?? '')}

@@ -156,7 +156,7 @@ export function LayerList({ derived }: { derived: Derived }) {
   return (
     <>
       <div className="bs-filter">
-        <SearchInput size="Small" accessibilityLabel="Filter layers" placeholder="Filter layers" value={q} onChange={({ value }) => setQ(value ?? '')} onClearButtonClick={() => setQ('')} />
+        <SearchInput size="Small" accessibilityLabel="Filter layers" placeholder="Search…" value={q} onChange={({ value }) => setQ(value ?? '')} onClearButtonClick={() => setQ('')} />
       </div>
       <ScrollArea className="bs-scroll" viewportClassName="bs-scroll__viewport">
         {!sections.length ? <p className="BodySmallRegular bs-muted bs-pad">{`No layer matches “${q.trim()}”.`}</p> : null}

@@ -174,7 +174,7 @@ export function TargetsPage({ presenter, onOpenOnMap }: { presenter: Presenter; 
     <div className="tb">
       <div className="tb__bar">
         <div className="tb__filter">
-          <SearchInput accessibilityLabel="Filter targets" placeholder="Id, class, unit, token" value={q} onChange={({ value }) => setQ(value ?? '')} onClearButtonClick={() => setQ('')} size="Small" />
+          <SearchInput accessibilityLabel="Filter targets" placeholder="Search…" value={q} onChange={({ value }) => setQ(value ?? '')} onClearButtonClick={() => setQ('')} size="Small" />
         </div>
         <DropdownMenu
           selectionType="multiple"

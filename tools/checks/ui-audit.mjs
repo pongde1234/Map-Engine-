@@ -286,11 +286,11 @@ await step('layers-new-cancelled', async () => {
 });
 await step('left-layers-filter', async () => {
   await tab(/^Layers/).click();
-  await page.getByPlaceholder(/Filter layers/i).fill('air');
+  await page.getByLabel('Filter layers').fill('air');
   await wait(600);
 });
 await step('left-layers-scrolled', async () => {
-  await page.getByPlaceholder(/Filter layers/i).fill('');
+  await page.getByLabel('Filter layers').fill('');
   await page.locator('.bs-left .bs-scroll__viewport').first().evaluate((el) => el.scrollTo(0, el.scrollHeight));
   await wait(500);
 });
