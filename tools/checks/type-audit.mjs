@@ -56,6 +56,10 @@ const collect = () => {
       fds: !!el.closest('.ds-badge, .ds-counter, .ds-avatar'),
       ctl: !!el.closest('button, [role="button"], .ds-badge, .ds-counter, .ds-avatar'),
       text: text.slice(0, 26),
+      // A panel list row's own text (docs/TYPE.md): its title and its detail line.
+      row: el.closest('.bs-left, .bs-right, .tb__detail, .sv__rail, .sv__record')
+        ? el.classList.contains('ds-action-list-item__title') ? 'title' : el.classList.contains('ds-action-list-item__description') ? 'detail' : null
+        : null,
     });
   }
   return out;
@@ -101,9 +105,11 @@ for (const theme of themes) {
     const ctl = new Set(v.rows.filter((r) => r.ctl && r.ratio < 4.5).map((r) => r.text));
     const pairs = new Set(counted.map((r) => `${r.size}/${r.weight}`));
     const share = counted.length ? small / counted.length : 0;
-    const bad = share > SMALL_MAX || low.length > 0 || pairs.size > PAIRS_MAX;
+    // Panel list rows follow the roles: a title is 14px / 500, a detail line 12px.
+    const rowsOff = v.rows.filter((r) => (r.row === 'title' && (r.size !== 14 || r.weight !== '500')) || (r.row === 'detail' && r.size !== 12));
+    const bad = share > SMALL_MAX || low.length > 0 || pairs.size > PAIRS_MAX || rowsOff.length > 0;
     failed ||= bad;
-    console.log(`${bad ? 'FAIL' : 'ok  '} ${v.label.padEnd(24)} text ${String(counted.length).padStart(4)} · under 12px ${(share * 100).toFixed(0).padStart(3)}% · size/weight pairs ${pairs.size} · neutral under 4.5:1 ${low.length}${low.length ? ` (${low.slice(0, 3).map((r) => `"${r.text}" ${r.ratio}`).join(', ')})` : ''} · FDS controls under 4.5:1 ${ctl.size}`);
+    console.log(`${bad ? 'FAIL' : 'ok  '} ${v.label.padEnd(24)} text ${String(counted.length).padStart(4)} · under 12px ${(share * 100).toFixed(0).padStart(3)}% · size/weight pairs ${pairs.size} · neutral under 4.5:1 ${low.length}${low.length ? ` (${low.slice(0, 3).map((r) => `"${r.text}" ${r.ratio}`).join(', ')})` : ''} · FDS controls under 4.5:1 ${ctl.size} · list rows off-role ${rowsOff.length}${rowsOff.length ? ` (${rowsOff.slice(0, 3).map((r) => `"${r.text}" ${r.size}/${r.weight}`).join(', ')})` : ''}`);
   }
 }
 await browser.close();

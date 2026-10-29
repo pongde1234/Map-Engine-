@@ -82,6 +82,9 @@ export function MapHover() {
   );
 }
 
+/** A record's word as text: first letter up, underscores as spaces ("down" → "Down"). */
+const sentence = (w: string) => w.charAt(0).toUpperCase() + w.slice(1).replaceAll('_', ' ');
+
 /** The facts that say most about this kind of object at a glance, most useful first. */
 function hoverFacts(e: Entity, client: MapClient, t: number): Fact[] {
   const center = (client.scenario?.center ?? null) as [number, number] | null;
@@ -101,23 +104,23 @@ function hoverFacts(e: Entity, client: MapClient, t: number): Fact[] {
     e.group && ['Members', String(e.group.members.length)],
     (e.track?.axis ?? e.group?.axis) && ['Axis · wave', `${e.track?.axis ?? e.group?.axis} · ${e.track?.wave ?? e.group?.wave ?? '—'}`],
     // Fire units.
-    e.effector && ['Status', e.effector.status.toUpperCase()],
+    e.effector && ['Status', sentence(e.effector.status)],
     e.effector && ['Channels', `${e.effector.channels.busy} / ${e.effector.channels.total}`],
     mag && ['Rounds ready', `${mag.ready} / ${cap} · floor ${mag.floor}`],
     e.effector?.wez && ['Range', `${Math.round(e.effector.wez.max_m / 1000)} km`],
     // Sensors and plant.
     e.sensor && ['Sensor', e.sensor.type.replaceAll('_', ' ')],
     e.sensor && ['Range', `${Math.round((e.sensor.range_m ?? 0) / 1000)} km`],
-    e.sensor && ['Status', (e.health?.link ?? e.sensor.status).toUpperCase()],
+    e.sensor && ['Status', sentence(e.health?.link ?? e.sensor.status)],
     e.plant && ['Tier', `Tier ${e.plant.tier}`],
     e.plant && ['State', e.plant.state.replaceAll('_', ' ')],
     // Intel fragments.
     e.fragment && ['Source', e.fragment.source_kind.replaceAll('_', ' ')],
-    e.fragment && ['Confidence', e.fragment.confidence.toUpperCase()],
+    e.fragment && ['Confidence', sentence(e.fragment.confidence)],
     // Command and drawn objects.
     gd && e.geo_shape && ['Type', GEO_WORD[gd.type] ?? gd.type.replaceAll('_', ' ').replace(/^\w/, (c) => c.toUpperCase())],
     gd?.ring && ['Ring', gd.ring],
-    gd?.wcs && ['Weapons control', gd.wcs.toUpperCase()],
+    gd?.wcs && ['Weapons control', sentence(gd.wcs)],
     gd?.tot !== undefined && ['Time on target', `${raidLabel(gd.tot, client.scenario?.clock)} · ${gd.tot > t ? `in ${Math.ceil((gd.tot - t) / 60_000)} min` : 'passed'}`, 'wide'],
     e.geo_shape && ['Size', shapeSummary(e.geo_shape), 'wide'],
   ];

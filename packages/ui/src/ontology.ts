@@ -40,6 +40,7 @@ export function groupOf(e: Entity): LayerGroup & { layer: OntologyLayer } {
   const layer = e.layer as OntologyLayer;
   if (e.plant) return { layer, id: 'process-units', label: 'Process units', count: 0 };
   if (e.geo_details?.type === 'vp') return { layer, id: 'va-vp', label: 'VA/VP', count: 0 };
+  if (cls === 'intel_assessment') return { layer, id: 'assessments', label: 'Assessments', count: 0 };
   if (t === 'fragment') return { layer, id: 'fragments', label: 'Fragments', count: 0 };
   if (t === 'sensor') return { layer, id: 'sensors', label: 'Sensors', count: 0 };
   if (t === 'effector') return { layer, id: 'fire-units', label: 'Fire units', count: 0 };

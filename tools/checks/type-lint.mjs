@@ -6,6 +6,9 @@
 //     other than FDS's own tokens (var(--font-…), var(--line-height-…)).
 //   - a hex or rgb colour in a CSS color declaration, or a style={{ color … }} prop.
 //   - a validation error shown in the muted ink (an error is negative).
+//   - a Badge or ActionListItemBadge that is not Small: every tag in the console is one size (16px).
+//   - a CSS border-radius that is not a layout token (var(--bs-radius-zone) or var(--bs-radius-inner)),
+//     50% (a round disc), or a line marked /* component */ (a component's own detail).
 //   node tools/checks/type-lint.mjs
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, extname } from 'node:path';
@@ -18,6 +21,8 @@ const rules = [
   { id: 'xsmall', test: (l, ext) => (ext === '.tsx' || ext === '.ts') && /\b(BodyXSmall|CodeSmall)\w*/.test(l) && !/^\s*(\*|\/\/)/.test(l), msg: '10px type class: use a 12px role (see docs/TYPE.md)' },
   { id: 'font-prop', test: (l, ext) => (ext === '.tsx' && /\b(fontSize|fontFamily|fontWeight|lineHeight)\s*:/.test(l)) || (ext === '.css' && /^\s*(font-size|font-family|font-weight|line-height)\s*:/.test(l) && !/var\(--(font|line-height)/.test(l)), msg: 'hand-set font property: use an FDS type class or FDS font token' },
   { id: 'color-literal', test: (l, ext) => (ext === '.css' && /^\s*color\s*:\s*(#|rgb)/.test(l)) || (ext === '.tsx' && /style=\{\{[^}]*\bcolor\s*:/.test(l)), msg: 'text colour must be an FDS --text-* token' },
+  { id: 'radius', test: (l, ext) => ext === '.css' && /^\s*border(-[a-z]+)*-radius\s*:/.test(l) && !/var\(--bs-radius-(zone|inner)\)|:\s*50%|\/\* component \*\//.test(l), msg: 'layout corners use var(--bs-radius-zone) or var(--bs-radius-inner); mark a component detail /* component */' },
+  { id: 'badge-size', test: (l, ext) => ext === '.tsx' && /<(Badge|ActionListItemBadge)[^>]*size="(Medium|Large)"/.test(l), msg: 'tags are all one size: use size="Small"' },
   { id: 'muted-error', test: (l, ext) => ext === '.tsx' && /bs-muted/.test(l) && /\{error\}/.test(l), msg: 'an error is negative ink, not muted' },
 ];
 

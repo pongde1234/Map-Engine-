@@ -10,6 +10,7 @@ import {
   ActionList,
   ActionListItem,
   ActionListItemBadge,
+  ActionListItemIcon,
   ActionListSection,
   Badge,
   Button,
@@ -25,6 +26,7 @@ import {
 } from '@faclon-labs/fds';
 import { CLASSES, type AlertRule, type Entity, type EntityComponents, type RuleFirePayload } from '@me/schema';
 import type { MapClient } from '@me/client';
+import { BellRing } from 'lucide-react';
 import { useClient, useEngineTime, useEvents } from '@me/map-react';
 import { Review } from './Review.tsx';
 import { raidLabel } from './format.ts';
@@ -125,7 +127,8 @@ export function CustomAlertList({ onOpen }: { onOpen: (id: string) => void }) {
             value={e.entity_id}
             title={e.aliases?.name ?? e.entity_id}
             description={`${alertSummary(rule, client)}${last !== undefined ? ` · ${raidLabel(last, clock)}` : ''}`}
-            titleSuffix={<ActionListItemBadge className="bs-tag" size="Medium" color={state === 'fired' ? SEVERITY_COLOR[rule.severity] : 'Neutral'} emphasis="Subtle" label={state === 'fired' ? 'FIRED' : state === 'clear' ? 'CLEAR' : 'ARMED'} />}
+            leading={<ActionListItemIcon icon={BellRing} />}
+            titleSuffix={<ActionListItemBadge className="bs-tag" size="Small" color={state === 'fired' ? SEVERITY_COLOR[rule.severity] : 'Neutral'} emphasis="Subtle" label={state === 'fired' ? 'FIRED' : state === 'clear' ? 'CLEAR' : 'ARMED'} />}
             onClick={() => onOpen(e.entity_id)}
           />
         ))}
@@ -243,9 +246,9 @@ export function AlertRuleModal({ isOpen, alertId, onClose }: { isOpen: boolean; 
         <ModalBody>
           <Review
             lead={alertSummary(rule, client)}
-            state={<Badge size="Medium" color={alertState === 'fired' ? SEVERITY_COLOR[rule.severity] : 'Neutral'} emphasis="Subtle" label={alertState.toUpperCase()} />}
+            state={<Badge size="Small" color={alertState === 'fired' ? SEVERITY_COLOR[rule.severity] : 'Neutral'} emphasis="Subtle" label={alertState.toUpperCase()} />}
             facts={[
-              ['Severity', <Badge size="Medium" color={SEVERITY_COLOR[rule.severity]} emphasis="Subtle" label={rule.severity.toUpperCase()} />],
+              ['Severity', <Badge size="Small" color={SEVERITY_COLOR[rule.severity]} emphasis="Subtle" label={rule.severity.toUpperCase()} />],
               ['Label', <Badge size="Small" color="Notice" emphasis="Subtle" label={existing.label} />],
               ['Set by', existing.geo_details?.author ?? '—'],
               ['Set at', raidLabel(existing.ingest_time, clock)],
@@ -255,10 +258,8 @@ export function AlertRuleModal({ isOpen, alertId, onClose }: { isOpen: boolean; 
           />
           {error ? <p role="alert" className="BodySmallRegular bs-ink-negative">{error}</p> : null}
         </ModalBody>
+        {/* The header's ✕ closes it; the footer holds the one action. */}
         <ModalFooter>
-          <Button size="sm" variant="secondary" tone="neutral" onClick={onClose}>
-            Close
-          </Button>
           <Button size="sm" variant="primary" tone="negative" isLoading={busy} onClick={() => void withdraw()}>
             Withdraw alert
           </Button>

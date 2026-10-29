@@ -23,6 +23,7 @@ import { DAY, HOUR, MINUTE, type DecisionPayload, type JournalRecord, type RaidC
 import type { Bookmark } from '@me/client';
 import { useClient, useClientTick, useEngineTime, useEvents } from '@me/map-react';
 import { eventSummary, raidLabel } from './format.ts';
+import { typeClass } from './type.ts';
 import { KIND_PRIORITY, adaptiveTicks, bucketEvents, nearestBucket, snapToFrame, type Bucket, type EventKind } from './timeline.ts';
 
 interface Segment {
@@ -254,7 +255,7 @@ export function TimeBar({ bookmarks = [], onBookmark, current }: { bookmarks?: B
   // says so.
   const stepButton = (to: Bookmark | undefined, label: string, keyHint: string, Icon: typeof SkipBack) => {
     const btn = (
-      <Button iconOnly size="sm" variant="ghost" tone="neutral" aria-label={to ? `${label}: ${to.id}` : label} isDisabled={!to} onClick={() => to && onBookmark?.(to)}>
+      <Button iconOnly size="xs" variant="ghost" tone="neutral" aria-label={to ? `${label}: ${to.id}` : label} isDisabled={!to} onClick={() => to && onBookmark?.(to)}>
         <Icon size={14} />
       </Button>
     );
@@ -289,7 +290,7 @@ export function TimeBar({ bookmarks = [], onBookmark, current }: { bookmarks?: B
         <span className="bs-tl__transport" role="group" aria-label="Playback">
         {stepButton(prevFrame, 'Previous frame', '[', SkipBack)}
         <Tooltip content={clock.playing ? 'Pause (Space)' : 'Play (Space)'}>
-          <Button iconOnly size="sm" variant="primary" tone="brand" aria-label={clock.playing ? 'Pause' : 'Play'} onClick={() => (clock.playing ? client.pause() : client.play(rate))}>
+          <Button iconOnly size="xs" variant="primary" tone="brand" aria-label={clock.playing ? 'Pause' : 'Play'} onClick={() => (clock.playing ? client.pause() : client.play(rate))}>
             {clock.playing ? <Pause size={14} /> : <Play size={14} />}
           </Button>
         </Tooltip>
@@ -307,7 +308,7 @@ export function TimeBar({ bookmarks = [], onBookmark, current }: { bookmarks?: B
           }}
         >
           <DropdownMenuTrigger>
-            <Button size="sm" variant="secondary" tone="neutral" trailingIcon={<ChevronDown size={14} />} aria-label={`Playback rate ${clock.playing ? clock.rate : rate}×`}>
+            <Button size="xs" variant="secondary" tone="neutral" trailingIcon={<ChevronDown size={14} />} aria-label={`Playback rate ${clock.playing ? clock.rate : rate}×`}>
               {`${clock.playing ? clock.rate : rate}×`}
             </Button>
           </DropdownMenuTrigger>
@@ -351,7 +352,7 @@ export function TimeBar({ bookmarks = [], onBookmark, current }: { bookmarks?: B
           onChange={({ values }) => setHidden(new Set(LEGEND.filter((l) => !values.includes(l.id)).map((l) => l.id)))}
         >
           <DropdownMenuTrigger>
-            <Button size="sm" variant="secondary" tone="neutral" leadingIcon={<ListFilter size={14} />} trailingIcon={<ChevronDown size={14} />} aria-label={`Events shown: ${shownKinds.map((l) => l.label).join(', ') || 'none'}`}>
+            <Button size="xs" variant="secondary" tone="neutral" leadingIcon={<ListFilter size={14} />} trailingIcon={<ChevronDown size={14} />} aria-label={`Events shown: ${shownKinds.map((l) => l.label).join(', ') || 'none'}`}>
               {shownKinds.length === LEGEND.length ? 'Show' : `Show · ${shownKinds.length} of ${LEGEND.length}`}
             </Button>
           </DropdownMenuTrigger>
@@ -367,7 +368,7 @@ export function TimeBar({ bookmarks = [], onBookmark, current }: { bookmarks?: B
           <Badge size="Small" color="Positive" emphasis="Subtle" label="LIVE" />
         ) : (
           <Tooltip content="Follow the live head">
-            <Button size="sm" variant="ghost" tone="neutral" leadingIcon={<Radio size={14} />} aria-label="Live" onClick={() => client.live()}>
+            <Button size="xs" variant="ghost" tone="neutral" leadingIcon={<Radio size={14} />} aria-label="Live" onClick={() => client.live()}>
               Live
             </Button>
           </Tooltip>
@@ -508,11 +509,11 @@ function HoverCard({ hover, width, clock }: { hover: Hover; width: number; clock
         <div className="bs-tl__cardbody">
           {/* Over the bare track: just the time a click would go to (the axis is compressed, so it is not guessable). */}
           {hover.kind === 'Time' ? (
-            <span className="BodySmallSemibold bs-num">{hover.title}</span>
+            <span className={`${typeClass('row')} bs-num`}>{hover.title}</span>
           ) : (
             <>
               <span className="BodySmallRegular bs-muted">{hover.kind}</span>
-              <span className="BodySmallSemibold">{hover.title}</span>
+              <span className={typeClass('row')}>{hover.title}</span>
               {hover.at !== undefined ? <span className="BodySmallRegular bs-muted bs-num">{raidLabel(hover.at, clock)}</span> : null}
             </>
           )}

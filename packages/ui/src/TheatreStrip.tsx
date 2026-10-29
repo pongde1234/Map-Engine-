@@ -15,7 +15,7 @@ export function TheatreStrip({ derived, channels, engaging, onOpen }: { derived:
   const over = channels > 0 && derived.rings.R3 > channels;
   return (
     <Tooltip content="The whole theatre: rings, rules, raid groups, fire units. Click to see it (clears the selection).">
-      <Button size="sm" variant="ghost" tone="neutral" isFullWidth aria-label={`Theatre: ${hostile} hostile tracks in the rings, ${derived.activeRules.length} rules fired, ${engaging} units engaging. Show the full summary.`} onClick={onOpen}>
+      <Button size="xs" variant="ghost" tone="neutral" isFullWidth aria-label={`Theatre: ${hostile} hostile tracks in the rings, ${derived.activeRules.length} rules fired, ${engaging} units engaging. Show the full summary.`} onClick={onOpen}>
         <span className="bs-pin">
           {RINGS.map((k) => (
             <span key={k} className="bs-pin__ring">

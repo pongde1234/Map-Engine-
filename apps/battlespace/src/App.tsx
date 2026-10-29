@@ -1,9 +1,9 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
-import { AppShell, Badge, TabItem, TabList, TabPanel, Tabs, ThemeProvider, ToastContainer } from '@faclon-labs/fds';
+import { AppShell, TabItem, TabList, TabPanel, Tabs, ThemeProvider, ToastContainer } from '@faclon-labs/fds';
 import { Crosshair, Map as MapIcon, Network } from 'lucide-react';
 import { MapClient, createViewStore, syncAcrossWindows } from '@me/client';
 import { MapEngineProvider, useClient, useViewStore } from '@me/map-react';
-import { ConnectionBanner, IconTitles, useDerived } from '@me/ui';
+import { ConnectionBanner, IconTitles, TruncationTitles, useDerived } from '@me/ui';
 import { BattlespacePage, type PanelState } from './BattlespacePage.tsx';
 import { DroppedCommands } from './DroppedCommands.tsx';
 import { fitPanels } from './panels.ts';
@@ -112,6 +112,7 @@ function Console() {
               setPage('targets');
             }}
             onAsk={ask}
+            onOpenBoard={() => setPage('targets')}
           />
         );
       case 'ontology':
@@ -153,9 +154,9 @@ function Console() {
       }
       actions={
         <>
-          {presenter.mode ? <Badge size="Medium" color="Information" emphasis="Subtle" label="PRESENTER" /> : null}
           <ShellActions onOpenOnMap={(id) => openOnMap(id)} />
           <IconTitles />
+          <TruncationTitles />
           <DroppedCommands />
         </>
       }

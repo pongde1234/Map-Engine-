@@ -416,9 +416,11 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
   refs.f2 = frag({ id: 'X-LCH-W', cls: 'launch_prep', st: d3 + 3 * HOUR + 12 * MINUTE, it: d3 + 7 * HOUR + 55 * MINUTE, at: AXES.west.launch, unc: [18_000, 9_000, 120], kind: 'space_isr', summary: 'Launch preparations, launch area W. Imagery change detection near coast.', conf: 'possible', sensorClass: 'space-based imagery (EO)' });
   const emitters: LonLat[] = [[69.3, 24.3], [69.47, 24.12], [69.04, 24.42]];
   refs.f3 = '';
+  const emitterRecs: string[] = [];
   emitters.forEach((at, i) => {
     const r = frag({ id: `X-EMT-${i + 1}`, cls: 'emitter', st: d3 + 9 * HOUR + i * 35 * MINUTE, it: d3 + 9 * HOUR + i * 35 * MINUTE + 4 * MINUTE, at, unc: [4000, 2500, 40 * i], kind: 'esm', summary: `New emitter ${i + 1} on north-west axis. Not previously catalogued.`, conf: 'likely', sensorClass: 'electronic support measures', planned: false });
     if (i === 0) refs.f3 = r;
+    emitterRecs.push(r);
   });
   refs.f4 = frag({ id: 'X-HQ-1', cls: 'hostile_hq', st: d3 + 14 * HOUR, it: d3 + 21 * HOUR + 30 * MINUTE, at: [69.38, 24.88], unc: [6000, 6000, 0], kind: 'humint', summary: 'Senior rocket-force officer reported at forward headquarters.', conf: 'possible', sensorClass: 'human reporting', planned: false });
   refs.f5 = frag({ id: 'X-OSINT-1', cls: 'report', st: d3 + DAYS(1) + 11 * HOUR, it: d3 + DAYS(1) + 11 * HOUR + 20 * MINUTE, at: VP, kind: 'osint', summary: 'Adversary speech names the refinery as a target.', conf: 'confirmed', sensorClass: 'open source (speech)', planned: false });
@@ -428,6 +430,32 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
   const d1 = T0 + 2 * DAYS(1);
   refs.f6 = frag({ id: 'X-LCH-N', cls: 'launch_prep', st: d1 + 4 * HOUR, it: d1 + 8 * HOUR + 30 * MINUTE, at: AXES.north.launch, unc: [8000, 5000, 20], kind: 'space_isr', summary: 'Launch preparations, launch area N (repeat). Canister count rising.', conf: 'likely', sensorClass: 'space-based imagery (SAR)' });
   refs.f7 = frag({ id: 'X-LCH-W', cls: 'launch_prep', st: d1 + 4 * HOUR + 3 * MINUTE, it: d1 + 8 * HOUR + 40 * MINUTE, at: AXES.west.launch, unc: [9000, 5000, 120], kind: 'space_isr', summary: 'Launch preparations, launch area W (repeat).', conf: 'likely', sensorClass: 'space-based imagery (EO)' });
+
+  // All-source assessments (fused layer, no position): what the fragments add up to, derived from
+  // them, so the record reads fragments → assessment → decision. Each is revised once by a later
+  // fragment (version 2, derived from it and from the first version). Notional, like the fragments.
+  const assess = (id: string, name: string, t: number, derived: string[]) =>
+    E.emit('fused', 'fused', {
+      entity_id: id,
+      source_time: t,
+      ingest_time: t + 10 * MINUTE,
+      provenance: { ...P.intel, sensor_class: 'all-source assessment' },
+      thread_id: TH_IW,
+      derived_from: derived,
+      releasability: REL_JOINT,
+      payload: {
+        ontology: { template: 'fragment', class: 'intel_assessment' },
+        aliases: { name },
+        expiry_time: t + 9 * DAYS(1),
+        indicators: { notional: true },
+      } satisfies EntityComponents,
+    });
+  const iaN = assess('X-IA-N', 'North axis: launch preparation likely', d3 + 10 * HOUR + 30 * MINUTE, [refs.f1, ...emitterRecs]);
+  const iaW = assess('X-IA-W', 'West axis: launch preparation likely', d3 + 10 * HOUR + 40 * MINUTE, [refs.f2]);
+  const iaInt = assess('X-IA-INT', 'Intent: strike on the refinery possible', d3 + 21 * HOUR + 45 * MINUTE, [refs.f4]);
+  assess('X-IA-INT', 'Intent: refinery named as a target', d3 + DAYS(1) + 12 * HOUR, [refs.f5, iaInt]);
+  assess('X-IA-N', 'North axis: launch preparation likely', d1 + 9 * HOUR, [refs.f6, iaN]);
+  assess('X-IA-W', 'West axis: launch preparation likely', d1 + 9 * HOUR + 5 * MINUTE, [refs.f7, iaW]);
 
   // ============================================================ decisions before the raid
   const decision = (o: {
@@ -498,7 +526,7 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
   refs.dp1 = decision({
     t: dp1T,
     thread: TH_IW,
-    derived: [refs.f1, refs.f2, refs.f3, refs.dp0].filter(Boolean),
+    derived: [iaN, iaW, refs.dp0],
     author: 'Joint HQ West · L2 duty officer',
     payload: {
       dp: 'DP-1',
@@ -542,7 +570,7 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
   refs.dp2 = decision({
     t: dp2T,
     thread: TH_IW,
-    derived: [refs.f1, refs.f2, refs.f4],
+    derived: [iaN, iaW, iaInt],
     author: 'National level · L1',
     rel: ['NATIONAL'],
     payload: {

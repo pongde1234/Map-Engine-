@@ -89,24 +89,13 @@ export function createMapEngine(o: MapEngineOptions): MapEngine {
     pitch: o.pitch ?? 0,
     bearing: o.bearing ?? 0,
     maxBounds: o.maxBounds,
-    attributionControl: { compact: true },
+    // No ⓘ on the map: the data credits (style.ts ATTRIBUTION) stay on the sources, off the canvas.
+    attributionControl: false,
     maxPitch: 70,
     hash: false,
     fadeDuration: 0,
   });
   map.addControl(new ScaleControl({ maxWidth: 120, unit: 'metric' }), 'bottom-right');
-  // The attribution stays one click away behind its ⓘ (ADR 0003) but starts collapsed. MapLibre
-  // expands it once, when it first turns compact; collapsing it as soon as that happens sticks.
-  const attrib = (o.container as HTMLElement).querySelector('.maplibregl-ctrl-attrib');
-  if (attrib) {
-    const watch = new MutationObserver(() => {
-      if (!attrib.classList.contains('maplibregl-compact-show')) return;
-      attrib.classList.remove('maplibregl-compact-show');
-      attrib.removeAttribute('open');
-      watch.disconnect();
-    });
-    watch.observe(attrib, { attributes: true, attributeFilter: ['class'] });
-  }
   // Diagnostics hook for tests and devtools: document.querySelector('.me-map').__meMap
   (o.container as HTMLElement & { __meMap?: MlMap }).__meMap = map;
 
@@ -124,6 +113,11 @@ export function createMapEngine(o: MapEngineOptions): MapEngine {
   let lastTrackCount = 0;
   /** R3's outer circle: context traffic inside it draws at full strength. */
   let r3: { center: LonLat; radius_m: number } | null = null;
+  // Declutter: the map draws every second blue unit of each class (a class of one keeps its unit).
+  // Decided once per unit, in id order when first seen, so a symbol never flickers as others come
+  // and go. Map only: the record, the panels and the counts keep every unit.
+  const blueHidden = new Map<string, boolean>();
+  const blueSeen = new Map<string, number>();
 
   const tools = new DrawController(map);
   const overlay = new MapLibreOverlay({
@@ -210,6 +204,13 @@ export function createMapEngine(o: MapEngineOptions): MapEngine {
     }
     for (const id of [...areas.keys()]) if (!client.entities.has(id)) areas.delete(id);
     for (const id of [...templates.keys()]) if (!client.entities.has(id)) templates.delete(id);
+    const fresh = [...templates].filter(([id, tp]) => tp.key === 'fused.blue' && !blueHidden.has(id)).map(([id]) => id).sort();
+    for (const id of fresh) {
+      const cls = client.entities.get(id)?.ontology?.class ?? '';
+      const n = blueSeen.get(cls) ?? 0;
+      blueSeen.set(cls, n + 1);
+      blueHidden.set(id, n % 2 === 1);
+    }
     atlas.ensure(sidcs);
   }
 
@@ -283,6 +284,8 @@ export function createMapEngine(o: MapEngineOptions): MapEngine {
       }
       if (!tpl || vs.layers[key] === false) continue;
       if (folded.has(e.entity_id)) continue;
+      // A thinned blue unit still shows when the reader picks it (selected, hovered, highlighted).
+      if (blueHidden.get(e.entity_id) && e.entity_id !== vs.selected && e.entity_id !== vs.hovered && !ctx.highlight.has(e.entity_id)) continue;
       const k = client.kin.get(e.entity_id);
       // Context traffic outside R3 draws quietly unless it is selected or hovered.
       const dim =

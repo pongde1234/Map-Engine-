@@ -388,7 +388,7 @@ export function deriveTargets(client: MapClient, t: number, center: LonLat): Tar
         'WCS',
         'Weapons control at position',
         !wcs ? 'pending' : wcs.wcs === 'free' ? 'pass' : wcs.wcs === 'tight' ? (idPass ? 'pass' : 'pending') : 'fail',
-        !wcs ? (p ? 'Outside the weapons-control sectors' : 'No position') : `${wcs.label} (${wcs.wcs.toUpperCase()})${wcs.wcs === 'tight' && !idPass ? ': positive identification needed' : ''}`,
+        !wcs ? (p ? 'Outside the weapons-control sectors' : 'No position') : `${wcs.label} (${wcs.wcs})${wcs.wcs === 'tight' && !idPass ? ': positive identification needed' : ''}`,
       ),
       check('d-civ', 'CIV', 'Civil picture', !p ? 'pending' : civ && civ.km < CIVIL_KM ? 'fail' : 'pass', !p ? 'No position' : civ && civ.km < CIVIL_KM ? `Civil ${civ.name} at ${civ.km.toFixed(1)} km` : `No civil track within ${CIVIL_KM} km`),
       check('d-deb', 'DEB', 'Debris footprint', refusedOpen || debrisHeld ? 'fail' : 'pass', refused ? (refused.payload.note ?? 'Engagement refused for debris') : pair?.debrisOver ? `Over ${pair.debrisOver}` : 'Clear of Tier-1 units'),

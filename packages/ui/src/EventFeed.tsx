@@ -84,7 +84,6 @@ export function EventFeed({ limit = 200 }: { limit?: number }) {
   const floor = SEVERITY_RANK[filter.min];
   const list: Array<{ r: JournalRecord; sev: Severity }> = [];
   let received = 0;
-  let matching = 0;
   for (let i = events.length - 1; i >= 0; i--) {
     const r = events[i]!;
     // Engagement noise: launches are implied by the assignment and the result.
@@ -93,7 +92,6 @@ export function EventFeed({ limit = 200 }: { limit?: number }) {
     if (types && !types.some((x) => x.kinds.includes(r.kind) && (!x.match || x.match(r)))) continue;
     const sev = severityOf(r);
     if (SEVERITY_RANK[sev] < floor) continue;
-    matching++;
     if (list.length < limit) list.push({ r, sev });
   }
   const clock = client.scenario?.clock;
@@ -131,9 +129,6 @@ export function EventFeed({ limit = 200 }: { limit?: number }) {
             </ActionList>
           </DropdownMenuOverlay>
         </DropdownMenu>
-        <span className="BodySmallRegular bs-muted bs-num bs-feedbar__count">
-          {matching === received ? received : `${matching} / ${received}`}
-        </span>
       </div>
       <ScrollArea className="bs-scroll" viewportClassName="bs-scroll__viewport">
         <CustomAlertList onOpen={(id) => setAlertDialog({ open: true, id })} />
@@ -151,8 +146,9 @@ export function EventFeed({ limit = 200 }: { limit?: number }) {
                   description={s.detail ? `${raidLabel(r.ingest_time, clock)} · ${s.detail}` : raidLabel(r.ingest_time, clock)}
                   isSelected={!!s.subject && s.subject === selected}
                   intent={r.kind === 'rule_fire' && sev === 'high' ? 'negative' : undefined}
+                  {...(r.kind === 'rule_fire' && sev === 'high' ? { className: 'bs-alert--high' } : {})}
                   leading={<ActionListItemIcon icon={ICON[r.kind as keyof typeof ICON] ?? FileSearch} />}
-                  {...(badge ? { titleSuffix: <ActionListItemBadge className="bs-tag" size="Medium" color={badge.color} emphasis="Subtle" label={badge.label} /> } : {})}
+                  {...(badge ? { titleSuffix: <ActionListItemBadge className="bs-tag" size="Small" color={badge.color} emphasis="Subtle" label={badge.label} /> } : {})}
                   onClick={() => s.subject && view.set({ selected: s.subject, locate: s.subject })}
                 />
               );

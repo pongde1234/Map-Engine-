@@ -1,10 +1,9 @@
-/* Map chrome restyled with FDS tokens (attribution, scale). */
+/* Map chrome restyled with FDS tokens (the scale). */
 .me-map {
   position: absolute;
   inset: 0;
   background: var(--background-surface-moderate);
 }
-.me-map .maplibregl-ctrl-attrib,
 .me-map .maplibregl-ctrl-scale {
   background: var(--background-surface-subtle);
   color: var(--text-neutral-muted);
@@ -12,17 +11,10 @@
 }
 /* MapLibre's own DOM cannot take an FDS type class, so its chrome uses the type tokens a
    BodySmallRegular is made of: Inter at 12px, not MapLibre's Helvetica at 10px. */
-.me-map .maplibregl-ctrl-attrib,
 .me-map .maplibregl-ctrl-scale {
   font-family: var(--font-family);
   font-size: var(--font-size-75);
   line-height: var(--line-height-75);
-}
-.me-map .maplibregl-ctrl-attrib a {
-  color: var(--text-neutral-muted);
-}
-.me-map .maplibregl-ctrl-attrib-button {
-  filter: none;
 }
 .me-map .maplibregl-canvas:focus-visible {
   outline: var(--border-width-thin) solid var(--border-focused);

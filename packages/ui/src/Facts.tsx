@@ -3,7 +3,8 @@
  * Lighter than a Table for a handful of values (no header band, no 40px rows); FDS has no
  * description-list component, so this is markup and FDS type classes only. A wide fact spans
  * both columns (long values: positions, notes, hashes). `flush` drops the panel padding, for
- * use inside a Card that already pads.
+ * use inside a Card that already pads. The title is a section heading, or a `subhead` when the
+ * facts sit under a heading of their own (a card's).
  */
 import type { ReactNode } from 'react';
 import { typeClass } from './type.ts';
@@ -11,14 +12,14 @@ import { typeClass } from './type.ts';
 /** [label, value, wide?], or a falsy value to skip it (lets callers write `cond && [...]`). */
 export type Fact = [string, ReactNode] | [string, ReactNode, 'wide'] | null | false | undefined | '' | 0;
 
-export function Facts({ title, items, flush }: { title?: string; items: Fact[]; flush?: boolean }) {
+export function Facts({ title, titleRole = 'section', items, flush }: { title?: string; titleRole?: 'section' | 'subhead'; items: Fact[]; flush?: boolean }) {
   const rows = items.filter((f): f is [string, ReactNode] | [string, ReactNode, 'wide'] => Array.isArray(f));
   if (!rows.length) return null;
   return (
     <section className={flush ? 'bs-facts bs-facts--flush' : 'bs-facts'} aria-label={title}>
       {title ? (
         <div className="bs-sec__head">
-          <span className={typeClass('section')}>{title}</span>
+          <span className={typeClass(titleRole)}>{title}</span>
         </div>
       ) : null}
       <dl className="bs-facts__grid">

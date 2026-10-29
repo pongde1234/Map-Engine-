@@ -58,7 +58,7 @@ export function eventSummary(r: JournalRecord): { title: string; detail: string;
     }
     case 'engagement': {
       const p = r.payload as EngagementPayload;
-      return { title: `${p.result.toUpperCase()} ${p.target_id}`, detail: `${p.effector_id} · ${p.weapon}${p.note ? ` · ${p.note}` : ''}`, subject: p.target_id };
+      return { title: `${p.result.charAt(0).toUpperCase()}${p.result.slice(1)} ${p.target_id}`, detail: `${p.effector_id} · ${p.weapon}${p.note ? ` · ${p.note}` : ''}`, subject: p.target_id };
     }
     case 'bda': {
       const p = r.payload as BdaPayload;

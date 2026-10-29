@@ -14,10 +14,20 @@
   min-height: 0;
   min-width: 0;
 }
-/* Every side panel (left and right, on every view) is one width: 368px from the spacing scale, wide
-   enough for the five inspector tabs on one line inside the 12px inset. */
+/* Side panels are a share of the screen, the same on every view. A right panel (inspector, target
+   details, the Ontology record) is 20%, never under 352px (the five inspector tabs fit on one line
+   down to 340px inside the 12px inset) nor over 440px. A left panel (layers, alerts, sources; the Ontology rail)
+   holds lists and three tabs, so it is narrower: 18%, between 304px and 400px. A wide screen
+   gives the rest to the map. panels.ts reads the same rules (leftWidth, rightWidth). */
 :root {
-  --bs-panel-w: calc(var(--spacing-64) * 5.5 + var(--spacing-16));
+  --bs-panel-w: clamp(calc(var(--spacing-64) * 5.5), 20vw, calc(var(--spacing-64) * 6.875));
+  --bs-panel-left-w: clamp(calc(var(--spacing-64) * 4.75), 18vw, calc(var(--spacing-64) * 6.25));
+  /* Corner radius of layouts, never of components (a Card, Button, Badge keep FDS's own).
+     A surface that only holds other things takes one of two: a zone (a column, the page frame)
+     is 4px, an inner region (timeline lanes, a hover row) 2px. Both sit below the 8px of the
+     cards they hold, so a container is never rounder than its contents. */
+  --bs-radius-zone: var(--radius-s);
+  --bs-radius-inner: var(--radius-xs);
 }
 .bs-left,
 .bs-right {
@@ -37,7 +47,7 @@
 .bs-left {
   grid-column: 1;
   grid-row: 1;
-  width: var(--bs-panel-w);
+  width: var(--bs-panel-left-w);
   border-right-width: var(--border-width-thin);
 }
 .bs-right {
@@ -99,170 +109,71 @@
   flex: 1 1 auto;
   min-height: 0;
 }
-/* Fire units: one grid row per defence layer, its units listed beneath it when open. */
-/* Fire units table (FireUnits.tsx): a header over an FDS ActionList. Each row's trailing slot
-   holds the two meter columns at fixed widths, so figures and meters line up down the list and
-   under the header; the header carries the same right inset as the rows. */
-.bs-fu--head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) calc(var(--spacing-64) + var(--spacing-8)) calc(var(--spacing-64) + var(--spacing-8));
-  align-items: center;
-  gap: var(--spacing-12);
-  /* "Layer" over the names: past the list and row insets (8 + 8) and the chevron with its gap (24). */
-  padding-inline: calc(var(--spacing-16) + var(--spacing-24)) var(--spacing-16);
-  min-width: 0;
-}
-.bs-fu__cells {
-  display: grid;
-  grid-template-columns: calc(var(--spacing-64) + var(--spacing-8)) calc(var(--spacing-64) + var(--spacing-8));
-  gap: var(--spacing-12);
-  align-items: center;
-}
-/* One ActionList per layer; an open layer's units end with an FDS Divider. */
-.bs-fu__groups {
-  display: flex;
-  flex-direction: column;
-}
-/* The rule closing an open layer is as wide as the rows that opened (the list's own 8px inset
-   each side), not the whole section. */
-.bs-fu__rule {
-  padding-inline: var(--spacing-8);
-}
-/* A layer's name is a step above its units': medium against their regular. */
-.bs-fu__item:not(.bs-fu__item--unit) .ds-action-list-item__title {
-  font-weight: var(--font-weight-medium);
-}
-/* A unit's name sits under its layer's name: the indent takes the chevron's place. */
-.bs-fu__indent {
-  display: inline-block;
-  width: var(--spacing-16);
-}
-.bs-fu__meter {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-4);
-  min-width: 0;
-}
-/* A meter with the reserve floor marked: a thin tick over the bar at floor / capacity. */
-.bs-meter {
-  position: relative;
-  display: block;
-}
-.bs-meter__floor {
-  position: absolute;
-  top: calc(var(--spacing-2) * -1);
-  bottom: calc(var(--spacing-2) * -1);
-  width: var(--border-width-thick);
-  margin-left: calc(var(--border-width-thick) / -2);
-  border-radius: var(--radius-s);
-  background: var(--text-neutral-normal);
-  pointer-events: none;
+
+/* Fire units (FireUnits.tsx): FDS Table indents a tree row's title past its chevron (20px button,
+   8px gap, 16px a level) but not the description beneath it. Same indent, so the second line
+   starts under the name. Drop this once FDS indents the description itself. */
+.bs-fu-table .ds-table__cell-description {
+  padding-inline-start: calc(var(--spacing-20) + var(--spacing-8) + var(--ds-table-depth, 0) * var(--spacing-16));
 }
 
-/* Metric tiles (Kpi.tsx): two a row, sharing hairlines, out to the section's edges (its 12px
-   padding), with a line above the first row. The tiles carry the section's 12px inset inside.
-   As a section's last block the grid also runs to its foot, so the hairlines meet the divider. */
-.bs-kpis {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-inline: calc(var(--spacing-12) * -1);
-  border-top: var(--border-width-thin) solid var(--border-neutral-default);
-}
-.bs-kpis:last-child {
-  margin-bottom: calc(var(--spacing-12) * -1);
-}
-.bs-kpi {
+/* Object header (ObjectHead.tsx): dot and name, the status line, "this → that", the actions. */
+.bs-head {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-8);
-  padding: var(--spacing-16) var(--spacing-12);
   min-width: 0;
 }
-.bs-kpi:nth-child(odd) {
-  border-right: var(--border-width-thin) solid var(--border-neutral-default);
-}
-.bs-kpi:nth-child(n + 3) {
-  border-top: var(--border-width-thin) solid var(--border-neutral-default);
-}
-.bs-kpi__head {
+.bs-head__title {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--spacing-8);
   min-width: 0;
 }
-.bs-kpi__icon {
+.bs-head__aside {
+  margin-left: auto;
   flex: none;
-  display: inline-flex;
+}
+.bs-head__status {
+  margin: 0;
+  min-width: 0;
+}
+/* "This → that": the first side at its own width, the arrow right after it, the second side in the
+   rest (it gives way first when the panel is narrow). */
+.bs-head__rel {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
-  width: var(--spacing-24);
-  height: var(--spacing-24);
-  border-radius: 50%;
+  gap: var(--spacing-12);
+  padding-block: var(--spacing-4);
 }
-.bs-kpi__icon--neutral {
-  background: var(--background-neutral-faded);
-  color: var(--text-neutral-muted);
+.bs-head__side {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  min-width: 0;
 }
-.bs-kpi__icon--notice {
-  background: var(--background-notice-faded);
-  color: var(--text-notice-normal);
+.bs-head__icon {
+  display: inline-flex;
+  flex: none;
 }
-.bs-kpi__icon--negative {
-  background: var(--background-negative-faded);
-  color: var(--text-negative-normal);
+.bs-head__sidetext {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
-.bs-kpi__icon--positive {
-  background: var(--background-positive-faded);
-  color: var(--text-positive-normal);
-}
-.bs-kpi__icon--brand {
-  background: var(--background-brand-faded);
-  color: var(--text-brand-normal);
-}
-.bs-kpi__value {
+.bs-head__fig {
   display: flex;
   align-items: baseline;
   gap: var(--spacing-4);
   min-width: 0;
 }
-.bs-kpi__foot {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-6);
-  min-width: 0;
+.bs-head__actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--spacing-8);
 }
-.bs-kpi__trend {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-4);
-  white-space: nowrap;
-}
-.bs-kpi__trend--neutral {
-  color: var(--text-neutral-muted);
-}
-.bs-kpi__trend--notice {
-  color: var(--text-notice-normal);
-}
-.bs-kpi__trend--negative {
-  color: var(--text-negative-normal);
-}
-.bs-kpi__trend--positive {
-  color: var(--text-positive-normal);
-}
-.bs-kpi__trend--brand {
-  color: var(--text-brand-normal);
-}
-.bs-kpi__note {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* The fire units' totals sit as the section's last row of tiles, before the layer grid. */
-.bs-fu__tiles {
-  margin-bottom: var(--spacing-4);
-  border-bottom: var(--border-width-thin) solid var(--border-neutral-default);
-}
+
 /* A dot in an operator object's map colour (its layer's, or its type's). */
 .bs-swatch {
   display: inline-block;
@@ -286,20 +197,62 @@
   align-items: center;
   gap: var(--spacing-6);
 }
-/* The end of a list row: a figure, its meter or limit, then the count. */
-.bs-rg__end {
-  display: flex;
-  flex: none;
-  align-items: center;
+/* Raid groups (RaidGroups.tsx): number tiles in two columns, each a button with no fill and the
+   subtle border a card has. */
+.bs-rg {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--spacing-8);
 }
-.bs-rg__end .ds-progress-bar {
-  flex: none;
-  width: var(--spacing-48);
-  min-width: var(--spacing-48);
+.bs-rg > * {
+  display: flex;
+  min-width: 0;
 }
-.bs-rg__sfx {
-  margin-left: var(--spacing-6);
+/* A tile fills its grid cell, and the cells in a row share one height. */
+.bs-rg__tile {
+  align-self: stretch;
+}
+.bs-rg__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-4);
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  box-sizing: border-box;
+  padding: var(--spacing-12);
+  /* No fill, the subtle border every card has (the user's call). */
+  border: var(--border-width-thin) solid var(--border-neutral-default);
+  /* A tile stands in for an FDS Card, so it takes the card's 8px. */
+  border-radius: var(--radius-m); /* component */
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.bs-rg__tile:hover {
+  border-color: var(--border-neutral-highlighted);
+}
+.bs-rg__tile:focus-visible {
+  outline: var(--border-width-thick) solid var(--border-focused);
+  outline-offset: var(--spacing-2);
+}
+/* The count, then its unit on the same baseline. */
+.bs-rg__fig {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-4);
+}
+/* The name is one line, cut with an ellipsis (the full name is the hover text), so every tile in the
+   grid is the same height. */
+.bs-rg__name {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* A finished sketch's popover points at this spot on the map (the top of the shape). */
@@ -333,10 +286,6 @@
 /* A severity tag keeps its full word; the title beside it ellipsises instead. */
 .bs-tag.bs-tag {
   flex-shrink: 0;
-}
-.bs-feedbar__count {
-  margin-left: auto;
-  white-space: nowrap;
 }
 
 /* Facts: label over value, two columns; wide facts span both. */
@@ -385,6 +334,11 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
+/* A half-width fact whose value may wrap (a name) instead of being cut. */
+.bs-fact__value .bs-wrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .bs-fact__value {
   margin: 0;
   min-width: 0;
@@ -417,6 +371,11 @@
 }
 
 /* ---------- map HUD positioning ---------- */
+/* An FDS Divider in a column: FDS grows a horizontal one (flex-grow, for rows), which in a
+   column stretches it into empty space. It keeps its own height here. */
+.bs-divider {
+  flex: none;
+}
 .bs-hud {
   position: absolute;
   display: flex;
@@ -470,6 +429,12 @@
 .bs-hud--bl {
   bottom: var(--spacing-8);
   left: var(--spacing-8);
+}
+/* Tags at the end of a row (a layer's age and count): a small gap, never wrapping. */
+.bs-trail {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-4);
 }
 .bs-badges,
 .bs-row {
@@ -529,11 +494,23 @@
   justify-content: space-between;
   gap: var(--spacing-8);
   min-width: 0;
+  /* The card takes no padding of its own (FDS's least is 12): this is its inset, inside its width. */
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--spacing-12);
 }
 .bs-hcard__text {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+/* An evidence card's text sits straight in the card (no row beside it): it takes the card's inset itself. */
+.ds-card > .bs-hcard__text,
+.ds-card > * > .bs-hcard__text:only-child {
+  padding: var(--spacing-12);
+}
+.bs-hcard > .bs-hcard__text {
+  padding: 0;
 }
 /* The likelihood word is never cut: the evidence line beside it wraps instead. */
 .bs-hcard > .ds-badge {
@@ -595,7 +572,7 @@
   overflow-x: clip;
   cursor: crosshair;
   touch-action: none;
-  border-radius: var(--radius-m);
+  border-radius: var(--bs-radius-inner);
 }
 /* A hover card sits above the pointer, over the lanes. */
 .bs-tl__card {
@@ -621,7 +598,7 @@
   min-width: calc(var(--spacing-64) * 3);
   max-width: calc(var(--spacing-64) * 4);
   /* The FDS Card is flat; floating over the map it takes the shadow FDS gives its floating surfaces. */
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-m); /* component */
   box-shadow: var(--shadow-l);
 }
 .bs-hovercard__body {
@@ -720,6 +697,82 @@
   padding: var(--spacing-12);
   border-bottom: var(--border-width-thin) solid var(--border-neutral-default);
 }
+/* Layer list (LayerList.tsx), flat: sections divided, each a heading with its eye over its rows.
+   A row: swatch, name, then age, count and eye at the right. */
+.bs-ll__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  /* Tight between sections (6px each side of the divider); the 12px inset at the sides. */
+  padding: var(--spacing-6) var(--spacing-12);
+}
+.bs-ll__head,
+.bs-ll__row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  min-width: 0;
+  min-height: var(--spacing-28);
+}
+.bs-ll__rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bs-ll__swatch {
+  flex: none;
+  width: var(--spacing-8);
+  height: var(--spacing-8);
+  border-radius: var(--bs-radius-inner);
+}
+.bs-ll__name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* A row's toggle: the whole line, a wash on hover. It reaches 6px past the content on each side
+   so the wash has room while the swatch, name and eye stay aligned with the section heading. */
+.bs-ll__hit {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  min-width: 0;
+  min-height: var(--spacing-28);
+  margin: 0 calc(var(--spacing-6) * -1);
+  padding: 0 var(--spacing-6);
+  border: 0;
+  border-radius: var(--bs-radius-inner);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.bs-ll__hit:hover {
+  background: var(--background-neutral-faded);
+}
+.bs-ll__hit:focus-visible {
+  outline: var(--border-width-thick) solid var(--border-focused);
+  outline-offset: calc(var(--spacing-2) * -1);
+}
+/* The eye: the row's state, at the IconButton's width so it lines up with the section's eye. */
+.bs-ll__icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--spacing-24);
+  color: var(--text-neutral-muted);
+}
+.bs-ll__hit:hover .bs-ll__icon {
+  color: var(--text-neutral-normal);
+}
+/* A hidden layer: its swatch fades with its name; the eye stays at full strength to bring it back. */
+.bs-ll__row--off .bs-ll__swatch {
+  opacity: 0.35;
+}
 .bs-fill {
   flex: 1 1 auto;
 }
@@ -747,6 +800,12 @@
 }
 .bs-ink-notice {
   color: var(--text-notice-normal);
+}
+.bs-ink-positive {
+  color: var(--text-positive-normal);
+}
+.bs-ink-info {
+  color: var(--text-info-normal);
 }
 .bs-num {
   white-space: nowrap;
@@ -812,4 +871,49 @@
 .bs-insp__pin .ds-btn__label {
   flex: 1 1 auto;
   overflow: visible;
+}
+
+/* The page frame is FDS's (AppShell), drawn at 8px: the one override of FDS internals the radius rule
+   needs, so the outermost corner is a zone like the board's columns. Re-check on an FDS upgrade. */
+.ds-shell .ds-shell__main {
+  border-radius: var(--bs-radius-zone);
+}
+
+/* FDS list rows in a panel take the type roles (type.ts, docs/TYPE.md) through FDS's own slots, so
+   a new list needs nothing per row: a row's title takes the `row` role's weight (500, normal ink)
+   at FDS's own 14px (FDS components keep their sizes; our 16px roles are for our own text); its
+   detail line carries data, so it is the secondary ink; a group title is the `label` role (12px,
+   500) in the same muted grey as every other muted text (lifted in dark, as .bs-muted is). */
+:is(.bs-left, .bs-right, .tb__detail, .sv__rail, .sv__record) .ds-action-list-item {
+  --al-description: var(--text-neutral-subtle);
+}
+:is(.bs-left, .bs-right, .tb__detail, .sv__rail, .sv__record) .ds-action-list-item__title {
+  font-weight: var(--font-weight-medium);
+}
+/* One 12px gutter in every panel, left and right: a section, a filter bar and a tab strip sit 12px in,
+   and so do a list row's icon and text and its tag at the end. FDS pads a list 8px and a row 8px (16
+   in), so the list takes 4px and the row's own 8px makes the 12. */
+:is(.bs-left, .bs-right, .tb__detail, .sv__rail, .sv__record) .ds-action-list {
+  padding-inline: var(--spacing-4);
+}
+/* The Ontology panels already inset their content (the rail's body, the record's tab panel), so a list
+   there takes no padding of its own: its rows start at that inset. */
+:is(.sv__rail, .sv__record) .ds-action-list {
+  padding: 0;
+}
+/* A row's figure or tag at the end keeps its width: FDS lets it shrink (min-width 0), so beside a long
+   description it was squeezed to a few pixels and its digits spilled out of the row. */
+:is(.bs-left, .bs-right, .tb__detail, .sv__rail, .sv__record) .ds-action-list-item__trailing {
+  flex: none;
+}
+:is(.bs-left, .bs-right, .tb__detail, .sv__rail, .sv__record) .ds-action-list-section__title {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-neutral-muted);
+}
+:root[data-theme='dark'] :is(.bs-left, .bs-right, .tb__detail, .sv__rail, .sv__record) .ds-action-list-section__title {
+  color: var(--text-neutral-subtle);
+}
+/* A high-severity alert is red in its icon and its tag; its title stays in normal ink. */
+.ds-action-list-item.bs-alert--high {
+  --al-title: var(--text-neutral-normal);
 }

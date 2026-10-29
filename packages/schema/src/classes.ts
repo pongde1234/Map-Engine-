@@ -91,6 +91,8 @@ export const CLASSES: Record<string, ClassDef> = Object.fromEntries(
     C({ id: 'emitter', abbr: 'EMT', label: 'New emitter', template: 'fragment', environment: 'land', identity: 'hostile', sidc: '10061500002203000000', age: 'intel' }),
     C({ id: 'hostile_hq', abbr: 'HQ', label: 'Forward headquarters', template: 'fragment', environment: 'land', identity: 'hostile', sidc: '10061002001100000000', age: 'intel' }),
     C({ id: 'report', abbr: 'RPT', label: 'Report', template: 'fragment', environment: 'land', identity: 'unknown', sidc: '10011000001100000000', age: 'intel' }),
+    // All-source assessment: what several fragments add up to (fused layer, no position of its own).
+    C({ id: 'intel_assessment', abbr: 'IA', label: 'Intel assessment', template: 'fragment', environment: 'land', identity: 'unknown', sidc: '10011000001100000000', age: 'intel' }),
     C({ id: 'io_claim', abbr: 'IO', label: 'Information-operations claim', template: 'fragment', environment: 'land', identity: 'hostile', sidc: '10061000001100000000', age: 'intel' }),
     C({ id: 'debris_report', abbr: 'DEB', label: 'Debris recovery report', template: 'fragment', environment: 'land', identity: 'unknown', sidc: '10011000001100000000', age: 'intel' }),
   ].map((d) => [d.id, d]),

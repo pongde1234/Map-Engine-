@@ -35,6 +35,7 @@ import { Pick } from './AlertRules.tsx';
 import { operatorLayers } from './OperatorLayers.tsx';
 import { raidLabel } from './format.ts';
 import { DEFAULT_SHAPE, SHAPES, SHAPE_ICON, TOOL_WORD, TYPE_WORD, WATCH, sketchReadout, typesFor } from './sketch.ts';
+import { typeClass } from './type.ts';
 
 const SHORTCUT: Record<ToolKind, string> = { draw: 'D', measure: 'M', geofence: 'G' };
 const TOOLS: ToolKind[] = ['draw', 'measure', 'geofence'];
@@ -304,7 +305,7 @@ export function PromoteModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     <Modal isOpen={isOpen && !!tool && asking} onDismiss={() => setAsking(false)} size="sm" accessibilityLabel="Discard the drawing">
       <ModalHeader title="Discard the drawing?" />
       <ModalBody>
-        <p className="BodyMediumRegular">The shape and what you typed are not kept.</p>
+        <p className={typeClass('body')}>The shape and what you typed are not kept.</p>
       </ModalBody>
       <ModalFooter>
         <Button size="sm" variant="secondary" tone="neutral" onClick={() => setAsking(false)}>

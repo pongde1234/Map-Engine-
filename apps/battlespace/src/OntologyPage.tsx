@@ -21,6 +21,7 @@ import {
   Badge,
   Button,
   Card,
+  Counter,
   DropdownMenu,
   DropdownMenuOverlay,
   DropdownMenuTrigger,
@@ -47,6 +48,7 @@ import {
   shortHash,
   stamp,
   theaterState,
+  typeClass,
   useChainCheck,
   type GraphNode,
   type OntologyGraph,
@@ -186,35 +188,36 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
         <span className="bs-fill" />
         {frame ? <Badge size="Small" color="Neutral" emphasis="Subtle" label={frame.id} /> : null}
         <Badge size="Small" color="Information" emphasis="Subtle" label={`PICTURE ${clock ? raidLabel(t, clock) : formatZulu(t).slice(0, 5)}`} />
-        <Badge size="Medium" color="Neutral" emphasis="Intense" label="SYNTHETIC" />
+        <Badge size="Small" color="Neutral" emphasis="Intense" label="SYNTHETIC" />
       </div>
 
       <aside className="sv__rail" aria-label="Theater State Model">
         <ScrollArea className="bs-scroll" viewportClassName="bs-scroll__viewport">
           <div className="sv__railbody">
-            <span className="BodySmallSemibold">Theater state model · five layers</span>
-            {layers.map((l) => (
-              <section key={l.layer} className="sv__level" aria-label={l.label}>
-                <div className="tb-check__head">
-                  <span className="BodyMediumSemibold">{l.label}</span>
-                  <Badge className="bs-tag" size="Small" color="Neutral" emphasis="Subtle" label={String(l.count)} />
-                </div>
-                <span className="BodySmallRegular bs-muted">{l.groups.length ? l.groups.map((g) => `${g.label} ${g.count}`).join(' · ') : 'None at this position'}</span>
-                {l.layer === 'fused' ? <span className="BodySmallRegular bs-muted">Truth + noise · not recomputed from the log in this build</span> : null}
-              </section>
-            ))}
-            <span className="BodySmallRegular bs-muted">{`Replay at a position: ${clock ? stamp(t, clock) : formatZulu(t)}`}</span>
+            <span className={typeClass('section')}>Theater state model · five layers</span>
+            {/* The five layers as the app's one list row (FDS ActionListItem): the layer, its groups beneath, its count at the end. */}
+            <ActionList accessibilityLabel="Layers of the Theater State Model">
+              {layers.map((l) => (
+                <ActionListItem
+                  key={l.layer}
+                  value={l.layer}
+                  title={l.label}
+                  description={`${l.groups.length ? l.groups.map((g) => `${g.label} ${g.count}`).join(' · ') : 'None at this position'}${l.layer === 'fused' ? ' · truth + noise, not recomputed from the log in this build' : ''}`}
+                  trailing={<ActionListItemText>{String(l.count)}</ActionListItemText>}
+                />
+              ))}
+            </ActionList>
           </div>
         </ScrollArea>
       </aside>
 
       <ScrollArea className="sv__main" viewportClassName="bs-scroll__viewport">
         <div className="sv__content">
-          <Card padding={12} size="Medium" accessibilityLabel="Lineage graph">
+          <Card padding={0} size="Medium" accessibilityLabel="Lineage graph">
             <div className="tb-check">
               <div className="tb-check__head">
-                <span className="BodySmallSemibold">{`Lineage graph · ${focusId ?? 'no source record'}`}</span>
-                <Badge className="bs-tag" size="Small" color="Neutral" emphasis="Subtle" label={loading ? 'READING' : `${g.nodes.length} NODES · ${g.edges.length} LINKS`} />
+                <span className={typeClass('section')}>{`Lineage graph · ${focusId ?? 'no source record'}`}</span>
+                <span className={`${typeClass('caption', 'secondary')} bs-num`}>{loading ? 'Reading…' : `${g.nodes.length} nodes · ${g.edges.length} links`}</span>
               </div>
               {focusId ? <Graph g={g} active={node?.id ?? null} onPick={(id) => (setPick(id), setTab('inspector'))} /> : <EmptyState title="No source record" description="Select a fragment on the map to see where it came from." />}
               <div className="on-legend">
@@ -226,17 +229,15 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
                     {w}
                   </span>
                 ))}
-                <span className="bs-fill" />
-                <span className="BodySmallRegular bs-muted">{`Coloured by permission for ${ROLES[viewAs]?.display ?? viewAs}`}</span>
               </div>
             </div>
           </Card>
 
-          <Card padding={12} size="Medium" accessibilityLabel="Rehearsal inset">
+          <Card padding={0} size="Medium" accessibilityLabel="Rehearsal inset">
             <div className="tb-check">
               <div className="tb-check__head">
-                <span className="BodySmallSemibold">Rehearsal inset · conflicting radar reports</span>
-                <Badge className="bs-tag" size="Medium" color="Neutral" emphasis="Intense" label="REHEARSAL" />
+                <span className={typeClass('section')}>Rehearsal inset · conflicting radar reports</span>
+                <Badge className="bs-tag" size="Small" color="Neutral" emphasis="Intense" label="REHEARSAL" />
               </div>
               {rehearsal.reports.length ? (
                 <>
@@ -245,6 +246,7 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
                       <Facts
                         key={r.id}
                         title={`Radar report · ${r.sensor}`}
+                        titleRole="subhead"
                         items={[
                           ['Report', r.report, 'wide'],
                           ['Height', r.heightM !== null ? `${Math.round(r.heightM)} m` : '—'],
@@ -257,16 +259,17 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
                     {rehearsal.assessment ? (
                       <Facts
                         title="Assessment · from both reports"
+                        titleRole="subhead"
                         items={[
                           ['Hypotheses', rehearsal.assessment.hypotheses.map((h) => `${h.label} ${Math.round(h.p * 100)}%`).join(' · '), 'wide'],
-                          ['State', <Badge className="bs-tag" size="Medium" color={rehearsal.assessment.contested ? 'Notice' : 'Positive'} emphasis="Subtle" label={rehearsal.assessment.contested ? 'CONTESTED' : 'RESOLVED'} />, 'wide'],
+                          ['State', <Badge className="bs-tag" size="Small" color={rehearsal.assessment.contested ? 'Notice' : 'Positive'} emphasis="Subtle" label={rehearsal.assessment.contested ? 'CONTESTED' : 'RESOLVED'} />, 'wide'],
                           ['Derived from', `${rehearsal.assessment.derivedFrom.length} radar reports`, 'wide'],
                           ['Record', shortHash(rehearsal.assessment.hash)],
                         ]}
                       />
                     ) : null}
                   </div>
-                  <span className="BodySmallRegular bs-muted">
+                  <span className={typeClass('caption', 'secondary')}>
                     {`The reports put the track ${rehearsal.apartM !== null ? `${(rehearsal.apartM / 1000).toFixed(1)} km apart` : 'apart'}; the assessment keeps both. Label ${rehearsal.label ?? '—'} · read by its thread; the raid clock is unchanged.`}
                   </span>
                 </>
@@ -299,9 +302,6 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
             </TabPanel>
           </ScrollArea>
         </Tabs>
-        <div className="bs-insp__foot">
-          <span className="BodySmallRegular bs-muted">Each assessment keeps the reports that produced it. Decision out: none.</span>
-        </div>
       </aside>
     </div>
   );
@@ -325,9 +325,10 @@ function adjacentLinks(g: OntologyGraph): OntologyGraph {
 }
 /** A column's card width, as laid out. */
 const layoutWidth = (l: { w: number }) => l.w;
-/** Node card height and the spacing of the columns; the card width fills the graph. */
-const NODE_H = 66;
-const NODE_H_PLAIN = 48;
+/** Node card height (8 + a 20px title + 2 + an 18px line + 8; a permission badge adds 20) and the
+    spacing of the columns; the card width fills the graph. */
+const NODE_H = 76;
+const NODE_H_PLAIN = 56;
 const ROW_GAP = 20; // between cards in a column: room for the links to read between them
 /** The gap between columns: 8% of the graph's width, between 32 and 96 px, so three columns always fit. */
 const colGap = (width: number) => Math.round(Math.min(96, Math.max(32, width * 0.08)));
@@ -377,7 +378,7 @@ const CardNode = memo(function CardNode({ data }: NodeProps<Node<CardData, 'card
 function HeadNode({ data }: NodeProps<Node<HeadData, 'head'>>) {
   return (
     <div style={{ width: data.w }}>
-      <span className="BodySmallSemibold">{data.title}</span>
+      <span className={typeClass('label')}>{data.title}</span>
     </div>
   );
 }
@@ -539,10 +540,11 @@ function NodeCard({ n, isActive, onPick }: { n: GraphNode; isActive: boolean; on
   return (
     <Card data-node={n.id} padding={0} size="Medium" isSelected={isActive} opacity={n.permitted === 'none' ? 0.55 : 1} accessibilityLabel={`${n.label}, ${p.label.toLowerCase()}`} onClick={onPick}>
       <div className="on-node">
-        <span className="BodySmallSemibold bs-ellipsis">{n.label}</span>
-        <span className="BodySmallRegular bs-muted bs-ellipsis">{n.focus ? `Source record · ${n.detail}` : `${LAYER_WORD[n.layer]} · ${n.detail}`}</span>
+        {/* 14px / 500, the size of an FDS list row's title: the graph's cards read as list rows. */}
+        <span className="BodyMediumMedium bs-ellipsis" title={n.label}>{n.label}</span>
+        <span className={`${typeClass('caption', 'secondary')} bs-num bs-ellipsis`}>{n.focus ? `Source record · ${n.detail}` : `${LAYER_WORD[n.layer]} · ${n.detail}`}</span>
         {/* Permission is stated only when it is not complete: a fully permitted node is the usual. */}
-        {n.permitted !== 'all' ? <Badge className="bs-tag" size="Medium" color={p.color} emphasis="Subtle" label={p.label} /> : null}
+        {n.permitted !== 'all' ? <Badge className="bs-tag" size="Small" color={p.color} emphasis="Subtle" label={p.label} /> : null}
       </div>
     </Card>
   );
@@ -559,10 +561,10 @@ function Inspector({ node, lineage, clock, root, onFocus }: { node: GraphNode; l
       <div role="group" aria-label={node.label}>
         <div className="tb-check">
           <div className="tb-check__head">
-            <span className="BodySmallSemibold">{node.label}</span>
-            {node.permitted !== 'all' ? <Badge className="bs-tag" size="Medium" color={PERMISSION[node.permitted].color} emphasis="Subtle" label={PERMISSION[node.permitted].label} /> : null}
+            <span className={`${typeClass('title')} bs-ellipsis`}>{node.label}</span>
+            {node.permitted !== 'all' ? <Badge className="bs-tag" size="Small" color={PERMISSION[node.permitted].color} emphasis="Subtle" label={PERMISSION[node.permitted].label} /> : null}
           </div>
-          <span className="BodySmallRegular bs-muted">{`${LAYER_WORD[node.layer]} layer · ${node.detail} · prepared before the raid`}</span>
+          <span className={`${typeClass('caption', 'secondary')} bs-num`}>{`${LAYER_WORD[node.layer]} layer · ${node.detail} · prepared before the raid`}</span>
           <ActionList accessibilityLabel={`${node.label} members`}>
             {members.map((m) => (
               <ActionListItem
@@ -587,10 +589,10 @@ function Inspector({ node, lineage, clock, root, onFocus }: { node: GraphNode; l
     <div role="group" aria-label={`${node.label} envelope`}>
       <div className="tb-check">
         <div className="tb-check__head">
-          <span className="BodySmallSemibold bs-ellipsis">{node.label}</span>
-          {node.permitted !== 'all' ? <Badge className="bs-tag" size="Medium" color={PERMISSION[node.permitted].color} emphasis="Subtle" label={PERMISSION[node.permitted].label} /> : null}
+          <span className={`${typeClass('title')} bs-ellipsis`}>{node.label}</span>
+          {node.permitted !== 'all' ? <Badge className="bs-tag" size="Small" color={PERMISSION[node.permitted].color} emphasis="Subtle" label={PERMISSION[node.permitted].label} /> : null}
         </div>
-        <span className="BodySmallRegular bs-muted">{`${LAYER_WORD[node.layer]} layer · ${node.detail}`}</span>
+        <span className={`${typeClass('caption', 'secondary')} bs-num`}>{`${LAYER_WORD[node.layer]} layer · ${node.detail}`}</span>
         <Facts
           title="Envelope"
           flush
@@ -629,8 +631,8 @@ function History({ node, lineage, clock }: { node: GraphNode; lineage: JournalRe
     <div role="group" aria-label={`${node.label} history`}>
       <div className="tb-check">
         <div className="tb-check__head">
-          <span className="BodySmallSemibold bs-ellipsis">{`History · ${node.label}`}</span>
-          <Badge className="bs-tag" size="Small" color="Neutral" emphasis="Subtle" label={`${rows.length} RECORD${rows.length === 1 ? '' : 'S'}`} />
+          <span className={`${typeClass('section')} bs-ellipsis`}>{`History · ${node.label}`}</span>
+          <Counter value={rows.length} max={999} size="Medium" color="Neutral" emphasis="Subtle" accessibilityLabel={`${rows.length} record${rows.length === 1 ? '' : 's'}`} />
         </div>
         <ActionList accessibilityLabel="Records">
           {rows.map((r) => (
@@ -639,7 +641,7 @@ function History({ node, lineage, clock }: { node: GraphNode; lineage: JournalRe
               value={r.record_id}
               title={r.kind === 'decision' || r.kind === 'engagement' || r.kind === 'bda' ? eventSummary(r).title : `${LAYER_WORD[r.layer as keyof typeof LAYER_WORD] ?? r.layer} record`}
               description={`${stamp(r.ingest_time, clock)} · ${r.provenance.source_feed}${r.derived_from?.length ? ` · derived from ${r.derived_from.length}` : ''} · ${shortHash(r.hash)}`}
-              titleSuffix={<ActionListItemBadge className="bs-tag" size="Medium" color="Neutral" emphasis="Subtle" label={r.label} />}
+              titleSuffix={<ActionListItemBadge className="bs-tag" size="Small" color="Neutral" emphasis="Subtle" label={r.label} />}
             />
           ))}
         </ActionList>

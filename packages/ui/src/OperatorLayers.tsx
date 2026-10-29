@@ -110,10 +110,8 @@ export function LayerEntryModal({ isOpen, layerId, onClose }: { isOpen: boolean;
           />
           {error ? <p role="alert" className="BodySmallRegular bs-ink-negative">{error}</p> : null}
         </ModalBody>
+        {/* The header's ✕ closes it; the footer holds the one action. */}
         <ModalFooter>
-          <Button size="sm" variant="secondary" tone="neutral" onClick={onClose}>
-            Close
-          </Button>
           <Button size="sm" variant="primary" tone="negative" isLoading={busy} onClick={() => void withdraw()}>
             Withdraw layer
           </Button>

@@ -35,6 +35,7 @@ export function BattlespacePage({
   presenter,
   onNominate,
   onAsk,
+  onOpenBoard,
 }: { derived: Derived; panels: PanelState; setPanels: (p: Partial<PanelState>) => void; presenter: Presenter } & InspectorHandover) {
   const client = useClient();
   const view = useViewStore();
@@ -231,7 +232,7 @@ export function BattlespacePage({
 
       {panels.rightOpen ? (
         <aside className="bs-right" aria-label="Inspector">
-          <Inspector derived={derived} {...(onNominate ? { onNominate } : {})} {...(onAsk ? { onAsk } : {})} />
+          <Inspector derived={derived} {...(onNominate ? { onNominate } : {})} {...(onAsk ? { onAsk } : {})} {...(onOpenBoard ? { onOpenBoard } : {})} />
         </aside>
       ) : null}
       <PromoteModal isOpen={promoteOpen} onClose={() => setPromoteOpen(false)} />

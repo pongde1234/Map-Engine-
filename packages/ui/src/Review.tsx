@@ -5,12 +5,13 @@
  */
 import type { ReactNode } from 'react';
 import { Facts, type Fact } from './Facts.tsx';
+import { typeClass } from './type.ts';
 
 export function Review({ lead, state, facts, note }: { lead: string; state?: ReactNode; facts: Fact[]; note: string }) {
   return (
     <div className="bs-review">
       <div className="bs-review__lead">
-        <span className="BodyMediumSemibold">{lead}</span>
+        <span className={typeClass('subhead')}>{lead}</span>
         {state}
       </div>
       <Facts flush items={facts} />
