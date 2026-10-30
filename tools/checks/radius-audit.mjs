@@ -1,8 +1,9 @@
 // Radius audit: layout corners are small, components keep FDS's.
 //   AUDIT_BASE=http://127.0.0.1:5174/ node tools/checks/radius-audit.mjs [width height]  (default 1440 900)
 // On Battlespace, Targets and Ontology, reads the computed corner radius of every surface at least 120x60:
-//   - layouts (not an FDS class, or the FDS page frame): at most 4px (--bs-radius-zone); fails above that;
-//   - components (ds-card and the like): reported, so a change to them is seen.
+//   - layouts (not an FDS class): at most 4px (--bs-radius-zone); fails above that;
+//   - components (ds-card, and the AppShell's page frame with FDS's own 8px top corners): reported,
+//     so a change to them is seen.
 // See the rule in packages/ui/src/styles.css (--bs-radius-zone, --bs-radius-inner).
 import { chromium } from 'playwright';
 
@@ -24,9 +25,8 @@ const scan = () =>
       if (!r || b.width < 120 || b.height < 60) return;
       const cls = (e.getAttribute('class') ?? '').split(/\s+/).filter(Boolean);
       const ds = cls.some((c) => c.startsWith('ds-'));
-      const frame = cls.includes('ds-shell__main');
       if (cls.includes('ds-card__overlay')) return;
-      rows.push({ name: cls.slice(0, 2).join('.') || e.tagName.toLowerCase(), radius: r, kind: ds && !frame ? 'component' : 'layout' });
+      rows.push({ name: cls.slice(0, 2).join('.') || e.tagName.toLowerCase(), radius: r, kind: ds ? 'component' : 'layout' });
     });
     return rows;
   });

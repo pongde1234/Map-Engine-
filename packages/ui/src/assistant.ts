@@ -264,12 +264,19 @@ export function suggestionsFor(client: MapClient, derived: Derived): string[] {
 
 const COA = /\b(should we|recommend|which (target|track) (to|should)|engage first|course of action|what to do|best (option|target))\b/i;
 
+/**
+ * What an agent answers about (the drawer's agent selector): the whole picture, a watch handover
+ * (what happened over the last minutes), or the decision record (decisions in force, authority).
+ * The same read-only tools and the same refusal of courses of action serve all three.
+ */
+export type AssistantFocus = 'picture' | 'handover' | 'decisions';
+
 /** Answer a question from the picture, stamped with the picture time it was read at. */
-export function answer(question: string, client: MapClient, derived: Derived): Answer {
-  return { ...answerFrom(question, client, derived), asOf: client.now() };
+export function answer(question: string, client: MapClient, derived: Derived, focus: AssistantFocus = 'picture'): Answer {
+  return { ...answerFrom(question, client, derived, focus), asOf: client.now() };
 }
 
-function answerFrom(question: string, client: MapClient, derived: Derived): Omit<Answer, 'asOf'> {
+function answerFrom(question: string, client: MapClient, derived: Derived, focus: AssistantFocus): Omit<Answer, 'asOf'> {
   const q = question.toLowerCase();
   if (COA.test(question)) {
     return {
@@ -278,6 +285,13 @@ function answerFrom(question: string, client: MapClient, derived: Derived): Omit
       cites: [],
     };
   }
+  // A handover agent summarises a window of time ("last 30 min"; 15 when none is named).
+  if (focus === 'handover') {
+    const mins = Number(/(\d+) ?min/.exec(q)?.[1] ?? (/\bhour\b/.test(q) ? 60 : 15));
+    return sitrep(client, derived, Math.min(240, Math.max(1, mins)));
+  }
+  // A decision-record agent reads the decisions in force, unless asked about one object.
+  if (focus === 'decisions' && !/\b([A-Z]{1,3}-[A-Z0-9-]{2,})\b/.test(question.replace(/\bDP-?\d+\b/gi, ''))) return decisions(client);
 
   const jm = /\bj(\d{1,2})\b/i.exec(question);
   if (jm) {

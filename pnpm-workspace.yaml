@@ -13,3 +13,4 @@ strictPeerDependencies: false
 linkWorkspacePackages: true
 minimumReleaseAgeExclude:
   - '@faclon-labs/fds@1.0.0'
+  - '@faclon-labs/fds@1.0.1'

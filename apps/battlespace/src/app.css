@@ -335,12 +335,19 @@ body {
 }
 
 /* ---------- Assistant (docked panel) ---------- */
+/* An assistant turn's parts (tool calls, the answer, its citations) stacked at 12px: the rhythm FDS
+   sets between the answer's own blocks (.ds-ai-response > * + *), so the turn reads as one. */
+.as__turn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-12);
+  min-width: 0;
+}
 .as__cite {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--spacing-6);
-  margin-top: var(--spacing-8);
 }
 
 /* ---------- Ontology Explorer ---------- */

@@ -873,12 +873,6 @@
   overflow: visible;
 }
 
-/* The page frame is FDS's (AppShell), drawn at 8px: the one override of FDS internals the radius rule
-   needs, so the outermost corner is a zone like the board's columns. Re-check on an FDS upgrade. */
-.ds-shell .ds-shell__main {
-  border-radius: var(--bs-radius-zone);
-}
-
 /* FDS list rows in a panel take the type roles (type.ts, docs/TYPE.md) through FDS's own slots, so
    a new list needs nothing per row: a row's title takes the `row` role's weight (500, normal ink)
    at FDS's own 14px (FDS components keep their sizes; our 16px roles are for our own text); its
@@ -916,4 +910,22 @@
 /* A high-severity alert is red in its icon and its tag; its title stays in normal ink. */
 .ds-action-list-item.bs-alert--high {
   --al-title: var(--text-neutral-normal);
+}
+
+/* An assistant agent's mark (AssistantPanel.tsx): a 16px tile in the agent's colour, a white glyph,
+   at the size FDS draws an agent's mark in the drawer header and its list. */
+.bs-agent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--spacing-16);
+  height: var(--spacing-16);
+  border-radius: var(--radius-xs); /* component */
+  color: var(--text-static-white-normal);
+}
+.bs-agent--positive {
+  background: var(--background-positive-default);
+}
+.bs-agent--notice {
+  background: var(--background-notice-default);
 }

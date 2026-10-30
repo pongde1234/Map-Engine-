@@ -11,7 +11,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@faclon-labs/fds": "^1.0.0",
+    "@faclon-labs/fds": "^1.0.1",
     "@me/client": "workspace:*",
     "@me/geo": "workspace:*",
     "@me/map": "workspace:*",

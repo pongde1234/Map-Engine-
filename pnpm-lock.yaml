@@ -188,8 +188,8 @@ importers:
   apps/battlespace:
     dependencies:
       '@faclon-labs/fds':
-        specifier: ^1.0.0
-        version: 1.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@dnd-kit/modifiers@9.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(@dnd-kit/sortable@10.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(@floating-ui/react@0.27.20(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(lucide-react@1.61.0(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react-markdown@10.1.0(@types/react@19.3.0)(react@19.3.1))(react@19.3.1)(rehype-sanitize@6.0.0)(remark-gfm@4.0.1)(remend@1.4.0)(shiki@4.5.0)
+        specifier: ^1.0.1
+        version: 1.0.1(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@dnd-kit/modifiers@9.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(@dnd-kit/sortable@10.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(@floating-ui/react@0.27.20(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(lucide-react@1.61.0(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react-markdown@10.1.0(@types/react@19.3.0)(react@19.3.1))(react@19.3.1)(rehype-sanitize@6.0.0)(remark-gfm@4.0.1)(remend@1.4.0)(shiki@4.5.0)
       '@me/client':
         specifier: workspace:*
         version: link:../../packages/client
@@ -438,8 +438,8 @@ importers:
   packages/ui:
     dependencies:
       '@faclon-labs/fds':
-        specifier: ^1.0.0
-        version: 1.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@dnd-kit/modifiers@9.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(@dnd-kit/sortable@10.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(@floating-ui/react@0.27.20(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(lucide-react@1.61.0(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        specifier: ^1.0.1
+        version: 1.0.1(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@dnd-kit/modifiers@9.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(@dnd-kit/sortable@10.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(@floating-ui/react@0.27.20(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(lucide-react@1.61.0(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react-markdown@10.1.0(@types/react@19.3.0)(react@19.3.1))(react@19.3.1)(rehype-sanitize@6.0.0)(remark-gfm@4.0.1)(remend@1.4.0)(shiki@4.5.0)
       '@me/client':
         specifier: workspace:*
         version: link:../client
@@ -703,8 +703,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@faclon-labs/fds@1.0.0':
-    resolution: {integrity: sha512-HGzT+KLG8lS7mWQCc/bqmJkn6qRO8IR1mDlrs45NYv/ZsLMZpl2nldDKjPzgR7m7faIkVmYXs9UGrawGkcNrSQ==}
+  '@faclon-labs/fds@1.0.1':
+    resolution: {integrity: sha512-dIveTPGaJhdiM90h2JeOS6dpnYOXp6kFyQoYTTtxxPcZxmQq17UeBsJsDvoNXlT0Ifoifl8FHZWKhszPTB3hlw==}
     engines: {node: '>=18'}
     peerDependencies:
       '@dnd-kit/core': ^6.3.1
@@ -2899,7 +2899,7 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@faclon-labs/fds@1.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@dnd-kit/modifiers@9.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(@dnd-kit/sortable@10.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(@floating-ui/react@0.27.20(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(lucide-react@1.61.0(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react-markdown@10.1.0(@types/react@19.3.0)(react@19.3.1))(react@19.3.1)(rehype-sanitize@6.0.0)(remark-gfm@4.0.1)(remend@1.4.0)(shiki@4.5.0)':
+  '@faclon-labs/fds@1.0.1(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@dnd-kit/modifiers@9.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(@dnd-kit/sortable@10.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(@floating-ui/react@0.27.20(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(lucide-react@1.61.0(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react-markdown@10.1.0(@types/react@19.3.0)(react@19.3.1))(react@19.3.1)(rehype-sanitize@6.0.0)(remark-gfm@4.0.1)(remend@1.4.0)(shiki@4.5.0)':
     dependencies:
       '@dnd-kit/core': 6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@dnd-kit/modifiers': 9.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)
@@ -2916,18 +2916,6 @@ snapshots:
       remark-gfm: 4.0.1
       remend: 1.4.0
       shiki: 4.5.0
-
-  '@faclon-labs/fds@1.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@dnd-kit/modifiers@9.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(@dnd-kit/sortable@10.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(@floating-ui/react@0.27.20(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(lucide-react@1.61.0(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
-    dependencies:
-      '@dnd-kit/core': 6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@dnd-kit/modifiers': 9.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)
-      '@dnd-kit/sortable': 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)
-      '@floating-ui/react': 0.27.20(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@fontsource-variable/inter': 5.3.0
-      '@fontsource-variable/jetbrains-mono': 5.3.0
-      lucide-react: 1.61.0(@types/react@19.3.0)(react@19.3.1)
-      react: 19.3.1
-      react-dom: 19.3.1(react@19.3.1)
 
   '@fastify/accept-negotiator@2.1.2': {}
 

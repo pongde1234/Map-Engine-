@@ -12,14 +12,14 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@faclon-labs/fds": "^1.0.0",
+    "@faclon-labs/fds": "^1.0.1",
     "@me/client": "workspace:*",
     "@me/geo": "workspace:*",
+    "@me/map": "workspace:*",
+    "@me/map-react": "workspace:*",
     "@me/schema": "workspace:*",
     "@me/symbology": "workspace:*",
-    "lucide-react": "^1.61.0",
-    "@me/map": "workspace:*",
-    "@me/map-react": "workspace:*"
+    "lucide-react": "^1.61.0"
   },
   "peerDependencies": {
     "react": ">=18 <20",
