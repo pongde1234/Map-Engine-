@@ -17,7 +17,7 @@
  * use FDS tokens and type classes only; hovers are FDS Cards.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionList, ActionListItem, ActionListItemIcon, ActionListItemText, ActionListSection, Badge, Button, Card, DropdownMenu, DropdownMenuOverlay, DropdownMenuTrigger, Tooltip } from '@faclon-labs/fds';
+import { ActionList, ActionListItem, ActionListItemIcon, ActionListItemText, ActionListSection, Badge, Button, IconButton, Card, DropdownMenu, DropdownMenuOverlay, DropdownMenuTrigger, Tooltip } from '@faclon-labs/fds';
 import { ChevronDown, History, ListFilter, Pause, Play, Radio, SkipBack, SkipForward } from 'lucide-react';
 import { DAY, HOUR, MINUTE, type DecisionPayload, type JournalRecord, type RaidClock } from '@me/schema';
 import type { Bookmark } from '@me/client';
@@ -255,9 +255,7 @@ export function TimeBar({ bookmarks = [], onBookmark, current }: { bookmarks?: B
   // says so.
   const stepButton = (to: Bookmark | undefined, label: string, keyHint: string, Icon: typeof SkipBack) => {
     const btn = (
-      <Button iconOnly size="xs" variant="ghost" tone="neutral" aria-label={to ? `${label}: ${to.id}` : label} isDisabled={!to} onClick={() => to && onBookmark?.(to)}>
-        <Icon size={14} />
-      </Button>
+      <IconButton icon={Icon} size="Medium" isHighlighted accessibilityLabel={to ? `${label}: ${to.id}` : label} isDisabled={!to} onClick={() => to && onBookmark?.(to)} />
     );
     // A disabled button gets no pointer events, so its tooltip sits on a span around it.
     return to ? (
@@ -365,7 +363,7 @@ export function TimeBar({ bookmarks = [], onBookmark, current }: { bookmarks?: B
           </DropdownMenuOverlay>
         </DropdownMenu>
         {clock.mode === 'live' ? (
-          <Badge size="Small" color="Positive" emphasis="Subtle" label="LIVE" />
+          <Badge size="Small" color="Positive" emphasis="Subtle" label="Live" />
         ) : (
           <Tooltip content="Follow the live head">
             <Button size="xs" variant="ghost" tone="neutral" leadingIcon={<Radio size={14} />} aria-label="Live" onClick={() => client.live()}>
@@ -471,7 +469,7 @@ export function TimeBar({ bookmarks = [], onBookmark, current }: { bookmarks?: B
                 }}
               >
                 <rect x={x - 5} y={BAR_Y} width={10} height={FRAMES_H + 4} style={{ fill: 'transparent' }} />
-                <line x1={x} x2={x} y1={BAR_Y} y2={BAR_Y + (lit ? FRAMES_H + 3 : FRAMES_H)} style={{ stroke: lit ? 'var(--text-neutral-normal)' : 'var(--border-neutral-highlighted)' }} strokeWidth={lit ? 2 : 1} />
+                <line x1={x} x2={x} y1={BAR_Y} y2={BAR_Y + (lit ? FRAMES_H + 3 : FRAMES_H)} style={{ stroke: lit ? 'var(--border-brand-default)' : 'var(--border-neutral-highlighted)' }} strokeWidth={lit ? 2 : 1} />
               </g>
             );
           })}
@@ -489,8 +487,8 @@ export function TimeBar({ bookmarks = [], onBookmark, current }: { bookmarks?: B
           {/* The hover guide. */}
           {hoverX !== null ? <line x1={hoverX} x2={hoverX} y1={BAR_Y} y2={AXIS_Y} pointerEvents="none" style={{ stroke: 'var(--border-neutral-highlighted)' }} strokeDasharray="2 3" /> : null}
           {/* The playhead: a 2 px line through the bar, out above and below it, with its handle above; its time is the readout above. */}
-          <line x1={playX} x2={playX} y1={HANDLE_Y} y2={AXIS_Y + 6} pointerEvents="none" style={{ stroke: 'var(--text-neutral-normal)' }} strokeWidth={2} />
-          <circle cx={playX} cy={HANDLE_Y} r={5} pointerEvents="none" style={{ fill: 'var(--text-neutral-normal)', stroke: 'var(--background-surface-intense)' }} strokeWidth={2} />
+          <line x1={playX} x2={playX} y1={HANDLE_Y} y2={AXIS_Y + 6} pointerEvents="none" style={{ stroke: 'var(--border-brand-default)' }} strokeWidth={2} />
+          <circle cx={playX} cy={HANDLE_Y} r={5} pointerEvents="none" style={{ fill: 'var(--background-brand-default)', stroke: 'var(--background-surface-intense)' }} strokeWidth={2} />
         </svg>
         {hover ? <HoverCard hover={hover} width={width} clock={s.clock} /> : null}
       </div>

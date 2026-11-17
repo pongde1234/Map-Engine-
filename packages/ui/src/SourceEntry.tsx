@@ -101,7 +101,7 @@ export function SourceEntryModal({ isOpen, sourceId, onClose }: { isOpen: boolea
     setError(null);
     const payload: EntityComponents = {
       aliases: { name: name.trim() },
-      geo_details: { type: 'source', label: name.trim().toUpperCase(), status: 'active', ...(note.trim() ? { note: note.trim() } : {}) },
+      geo_details: { type: 'source', label: name.trim(), status: 'active', ...(note.trim() ? { note: note.trim() } : {}) },
       source_entry: b.src,
     };
     try {
@@ -136,7 +136,7 @@ export function SourceEntryModal({ isOpen, sourceId, onClose }: { isOpen: boolea
         <ModalBody>
           <Review
             lead={sourceSummary(src)}
-            state={<Badge size="Small" color="Neutral" emphasis="Subtle" label="PLANNED" />}
+            state={<Badge size="Small" color="Neutral" emphasis="Subtle" label="Planned" />}
             facts={[
               ['Set by', existing.geo_details?.author ?? '—'],
               ['Set at', raidLabel(existing.ingest_time, clock)],

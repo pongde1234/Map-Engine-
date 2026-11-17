@@ -11,6 +11,12 @@ export function stamp(ms: number, clock: RaidClock | undefined): string {
   return l.startsWith('D') ? `${l} ${formatZulu(ms).slice(0, 5)}Z` : l;
 }
 
+/** A record's word as text: first letter up, underscores as spaces ("down" → "Down", "highly_likely" → "Highly likely"). */
+export const sentence = (w: string) => w.charAt(0).toUpperCase() + w.slice(1).replaceAll('_', ' ');
+
+/** An axis as a word: the record keeps it in capitals ("NORTH"), the screen in sentence case ("North"). */
+export const axisWord = (axis: string) => sentence(axis.toLowerCase());
+
 /** A plant unit's process state, in words. */
 export const PLANT_WORD: Record<string, string> = { running: 'running', depressurised: 'depressurised', feed_isolated: 'feed isolated', shutdown: 'shut down', restart_assessment: 'restart assessment' };
 

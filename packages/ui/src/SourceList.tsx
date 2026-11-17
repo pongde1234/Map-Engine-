@@ -18,15 +18,15 @@ import { SourceEntryModal, registeredSources, sourceSummary } from './SourceEntr
 
 /** A feed's state from the age of its newest update. */
 const FEED_STATUS: Record<AgeState, { color: 'Positive' | 'Notice' | 'Negative'; label: string }> = {
-  current: { color: 'Positive', label: 'UP' },
-  aging: { color: 'Notice', label: 'AGING' },
-  stale: { color: 'Negative', label: 'STALE' },
-  disc: { color: 'Negative', label: 'DOWN' },
+  current: { color: 'Positive', label: 'Up' },
+  aging: { color: 'Notice', label: 'Aging' },
+  stale: { color: 'Negative', label: 'Stale' },
+  disc: { color: 'Negative', label: 'Down' },
 };
 
-const SENSOR_STATUS = { up: { color: 'Positive', label: 'UP' }, degraded: { color: 'Notice', label: 'DEGRADED' }, down: { color: 'Negative', label: 'DOWN' } } as const;
+const SENSOR_STATUS = { up: { color: 'Positive', label: 'Up' }, degraded: { color: 'Notice', label: 'Degraded' }, down: { color: 'Negative', label: 'Down' } } as const;
 
-const PLANNED = <ActionListItemBadge className="bs-tag" color="Neutral" emphasis="Subtle" label="PLANNED" />;
+const PLANNED = <ActionListItemBadge className="bs-tag" color="Neutral" emphasis="Subtle" label="Planned" />;
 
 export function SourceList({ derived }: { derived: Derived }) {
   const client = useClient();
@@ -83,7 +83,7 @@ export function SourceList({ derived }: { derived: Derived }) {
           {feedCount ? (
           <ActionListSection title={`Feeds · ${feedCount}`}>
             {derived.sources.map((f) => {
-              const st = f.planned ? { color: 'Neutral' as const, label: 'STATIC' } : FEED_STATUS[f.newestState];
+              const st = f.planned ? { color: 'Neutral' as const, label: 'Static' } : FEED_STATUS[f.newestState];
               return (
                 <ActionListItem
                   key={f.feed}
@@ -104,7 +104,7 @@ export function SourceList({ derived }: { derived: Derived }) {
               title={s ? `${s.id}-${s.seed}` : 'Journal'}
               description={health ? `${health.records.toLocaleString('en')} records · root ${shortHash(health.head.hash)}${health.operator?.records ? ` · ${health.operator.records} drawn` : ''}` : 'Checking…'}
               leading={<ActionListItemIcon icon={Database} />}
-              {...(health ? { titleSuffix: <ActionListItemBadge className="bs-tag" color={health.chain.ok ? 'Positive' : 'Negative'} emphasis="Subtle" label={health.chain.ok ? 'VERIFIED' : 'BROKEN'} /> } : {})}
+              {...(health ? { titleSuffix: <ActionListItemBadge className="bs-tag" color={health.chain.ok ? 'Positive' : 'Negative'} emphasis="Subtle" label={health.chain.ok ? 'Verified' : 'Broken'} /> } : {})}
               trailing={<ActionListItemText>{health ? `${Math.round(health.records / 1000)}k` : '—'}</ActionListItemText>}
             />
           </ActionListSection>

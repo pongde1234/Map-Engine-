@@ -54,12 +54,26 @@ body {
   box-sizing: border-box;
   min-width: 0;
 }
+/* A tile line that wraps rather than being cut short (the authority holder, its detail). */
+.tb-tile__wrap {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .tb-tile__head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--spacing-8);
+  gap: var(--spacing-4) var(--spacing-8);
   min-width: 0;
+}
+/* The title stays on one line and the tag is never cut: where both do not fit, the tag moves under the title. */
+.tb-tile__head > :first-child {
+  white-space: nowrap;
+}
+.tb-tile__head > .ds-badge {
+  flex: none;
+  max-width: 100%;
 }
 .tb__board {
   grid-column: 1;
@@ -81,7 +95,7 @@ body {
 /* The larger lane and thumb are this bar's alone: set on .tb__board they would reach every
    column's own vertical bar, which stays FDS's default (4px, shown only while scrolling). */
 .tb__board > .ds-scroll__bar--x {
-  --scrollbar-size: var(--spacing-14, 14px);
+  --scrollbar-size: var(--spacing-12);
   --scrollbar-thumb-size: var(--spacing-8);
   opacity: 1;
   background: var(--background-neutral-faded);
@@ -128,7 +142,8 @@ body {
   flex-direction: column;
   min-height: 0;
   border: var(--border-width-thin) solid var(--border-neutral-default);
-  border-radius: var(--bs-radius-zone);
+  /* The FDS Card radius (--radius-m), so a column is as round as the cards in it. */
+  border-radius: var(--radius-m); /* component */
   /* The same surface as the side panels; the stage colour lives on the header badge. */
   background: var(--background-surface-intense);
 }
@@ -203,6 +218,17 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-4) var(--spacing-8);
+}
+/* A heading with its tag or count: one line, the tag right after the text, and the text gives way (ellipsis) first. */
+.tb-check__head--inline {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+}
+.tb-check__head--inline > * {
+  flex: none;
+}
+.tb-check__head--inline > .bs-ellipsis {
+  flex: 0 1 auto;
 }
 /* A target card: 8px between its rows (head, name, tags, gates, status); its badges are Medium (12px text), as every status word is. */
 .tb-card {
@@ -310,6 +336,10 @@ body {
 .sv__record .bs-tabbar {
   padding: var(--spacing-12);
 }
+/* Under the selected node's head, as an inspector's tabs sit under its head: no inset above. */
+.sv__record .bs-tabbar--insp {
+  padding-top: 0;
+}
 
 /* ---------- Console: a strip of views over the open view (no nav rail) ---------- */
 .console {
@@ -320,8 +350,18 @@ body {
    top of the tab, so the wrapper gives them that room above. */
 .console__tabs {
   flex: none;
+  /* The tabs at the left, the picture status at the right, centred on the tab row. */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-12);
   padding: var(--spacing-12) var(--spacing-12) 0;
   border-bottom: var(--border-width-thin) solid var(--border-neutral-default);
+}
+.console__tabs > .bs-badges {
+  flex: none;
+  /* Off the tab row's underline, level with the tab labels. */
+  padding-bottom: var(--spacing-12);
 }
 .console__view:not([hidden]) {
   display: flex;
@@ -405,18 +445,18 @@ body {
 }
 /* Legend swatches: each link type has its own colour and pattern. */
 .on-edge--derived-from {
-  stroke: var(--text-brand-normal);
+  stroke: var(--border-brand-default);
 }
 .on-edge--thread {
-  stroke: var(--text-notice-normal);
+  stroke: var(--border-notice-default);
   stroke-dasharray: 6 4;
 }
 .on-edge--protects {
-  stroke: var(--text-positive-normal);
+  stroke: var(--border-positive-default);
   stroke-dasharray: 1 5;
 }
 .on-edge--member-of {
-  stroke: var(--text-neutral-normal);
+  stroke: var(--border-neutral-highlighted);
   stroke-dasharray: 1 5;
 }
 /* The rehearsal inset: both radar reports and the assessment side by side. */
@@ -442,3 +482,57 @@ body {
   gap: var(--spacing-4);
 }
 
+/* ---------- Narrow screens (a phone, a small tablet) ---------- */
+/* Below 900px the board or the graph and a 352px panel cannot sit side by side: each view stacks its parts and
+   scrolls as one page, each part keeping a height of its own so its inner scrolling still works. */
+@media (max-width: 899px) {
+  .console__tabs {
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+  /* The picture status on a line of its own under the tabs, clear of them. */
+  .console__tabs > .bs-badges {
+    width: 100%;
+    padding-block: var(--spacing-8);
+  }
+  .tb,
+  .sv {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .tb > *,
+  .sv > * {
+    flex: none;
+  }
+  .tb__bar,
+  .sv__bar {
+    flex-wrap: wrap;
+  }
+  .tb__filter {
+    width: auto;
+    flex: 1 1 calc(var(--spacing-64) * 3);
+  }
+  /* The five tiles keep a readable width and scroll sideways. */
+  .tb__strip {
+    grid-template-columns: repeat(5, minmax(calc(var(--spacing-64) * 3), 1fr));
+    overflow-x: auto;
+    padding-bottom: var(--spacing-4);
+  }
+  .tb__board {
+    height: 70vh;
+  }
+  .tb__detail,
+  .sv__record {
+    height: 80vh;
+    border-left: none;
+    border-top: var(--border-width-thin) solid var(--border-neutral-default);
+  }
+  .sv__rail {
+    border-right: none;
+    border-bottom: var(--border-width-thin) solid var(--border-neutral-default);
+  }
+  .sv__main {
+    height: 80vh;
+  }
+}

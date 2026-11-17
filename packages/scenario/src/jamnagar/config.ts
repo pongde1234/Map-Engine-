@@ -14,10 +14,10 @@ export const SCENARIO_NAME = 'Jamnagar refinery defence (notional)';
 export const VP: LonLat = [69.86, 22.36];
 
 export const RINGS = [
-  { id: 'R4', inner: 60_000, outer: 150_000, label: 'R4 OUTER' },
-  { id: 'R3', inner: 20_000, outer: 60_000, label: 'R3 MIDDLE' },
-  { id: 'R2', inner: 5_000, outer: 20_000, label: 'R2 KEEP-OUT' },
-  { id: 'R1', inner: 0, outer: 5_000, label: 'R1 TERMINAL' },
+  { id: 'R4', inner: 60_000, outer: 150_000, label: 'R4 outer' },
+  { id: 'R3', inner: 20_000, outer: 60_000, label: 'R3 middle' },
+  { id: 'R2', inner: 5_000, outer: 20_000, label: 'R2 keep-out' },
+  { id: 'R1', inner: 0, outer: 5_000, label: 'R1 terminal' },
 ] as const;
 
 /** Raid day D (midnight UTC) and H (first Wave 2 drone reaches R1). */
@@ -29,13 +29,13 @@ export const T1 = D0 + DAY + 6 * HOUR; // D+1 06:00Z
 export const AXES = {
   north: {
     id: 'NORTH',
-    label: 'AXIS NORTH · MAIN WAVE OVER LAND',
+    label: 'Axis north · main wave over land',
     launch: [69.15, 24.7] as LonLat,
     via: [] as LonLat[],
   },
   west: {
     id: 'WEST',
-    label: 'AXIS WEST · MAIN WAVE OVER SEA',
+    label: 'Axis west · main wave over sea',
     launch: [67.6, 24.0] as LonLat,
     via: [[67.85, 22.6], [68.65, 22.0]] as LonLat[],
   },

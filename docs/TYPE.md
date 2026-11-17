@@ -14,15 +14,18 @@ One reading size: **16px for headings and body alike, set apart by weight**: sem
 | `row` | BodyLargeMedium (16) | normal | the title of a row or a card |
 | `value` | BodyMediumRegular (14) + tabular | normal | a fact's value |
 | `body` | BodyLargeRegular (16) | normal | a sentence of prose (a dialog's text) |
+| `item` | BodyMediumMedium (14) | normal | a name in a panel list built without ActionList (the layers list), matching the FDS list rows beside it |
 | `label` | BodySmallMedium (12) | muted | a field, tile or eyebrow label |
 | `caption` | BodySmallRegular (12) | muted, or secondary if it carries data | a secondary line |
 | `empty` | BodySmallRegular (12) | muted | nothing to show, in a list (FDS `EmptyState` for a whole area) |
 | `error` | BodySmallRegular (12) | negative | a validation message |
 | `alarm` | BodySmallMedium (12) | negative or notice | a status line the reader must act on |
 
-FDS list rows (`ActionListItem`, `ActionListSection`) in the panels take these roles from one scoped block at the end of `packages/ui/src/styles.css`: a row's title is 14px / 500 in normal ink, its detail line 12px in the secondary ink (it carries data), a group title 12px / 500 muted. A new list needs no per-row classes; `type-audit.mjs` fails a panel row off these sizes. A high-severity row is red in its icon and its tag only, never its title.
+FDS list rows (`ActionListItem`, `ActionListSection`) in the panels take these roles from one scoped block at the end of `packages/ui/src/styles.css`: a row's title is 14px / 500 in normal ink, its detail line 12px in the secondary ink (it carries data), a group title 12px / 500 muted. A new list needs no per-row classes; `type-audit.mjs` fails a panel row off these sizes. A high-severity row is red in its icon and its tag only, never its title. The layers list, which is not an ActionList, sets its names with the `item` role, so all three left-panel tabs read at the same size.
 
-Figures: a KPI tile is Metric Heading Large (24); a tile in the Target Board strip is Metric Heading Small (18); a figure in a dense row is BodySmallMedium with `bs-num`.
+The two side panels are one width (`--bs-panel-left-w` is `--bs-panel-w`: 20% of the screen, 352–440px), and both stay open on any desktop screen; only a window under about 1000px closes one for the other (`panels.ts`).
+
+Figures: nothing in the console is larger than 16px (user ruling 2026-11-12). A headline figure (the Theatre summary, a raid group, a tile in the Target Board strip) is Metric Body Large (16) Semibold: the weight, not the size, sets it apart from the 16px text around it. A figure in a dense row is BodySmallMedium with `bs-num`.
 
 ## Inks
 
@@ -33,7 +36,7 @@ Figures: a KPI tile is Metric Heading Large (24); a tile in the Target Board str
 
 ## Case
 
-Text is in sentence case: a state word is "Saturated", "Engaging", "At floor"; a kind is "Fused track". Capitals are kept for codes and identifiers only (R3, P1, DP-6, F-0530, NORTH · W1, MGRS, SYNTHETIC as the marking) and for Badge labels, which are chips. Colour and the dot already make a state stand out.
+Text is in sentence case, Badge labels included: a state word is "Saturated", "Engaging", "At floor", "Destroyed"; a kind is "Fused track"; an axis is "North · W1"; an age is "4 min". Capitals are kept only where the letters are the name: acronyms and codes (R3, P1, DP-6, F-0530, W1, MR SAM, AEW&C, VA/VP, MGRS, ID) and the data marking SYNTHETIC//DEMO. Colour and the dot already make a state stand out. A name an operator types is kept as typed. A record that stores a word in capitals (an axis, "NORTH") is sentence-cased where it is shown (`axisWord`, `sentence` in format.ts).
 
 ## Size floor
 

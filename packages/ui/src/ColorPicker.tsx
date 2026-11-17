@@ -3,7 +3,7 @@
  * row (FDS Buttons, the chosen one raised), and a reset to the console's own pick once another
  * is chosen. Always shows the colour in use, so the default reads as chosen until it is changed.
  */
-import { Button, Tooltip } from '@faclon-labs/fds';
+import { Button, IconButton, Tooltip } from '@faclon-labs/fds';
 import { RotateCcw } from 'lucide-react';
 import type { OperatorColor } from '@me/schema';
 import { COLOR_TONE, OPERATOR_COLORS, toneCss } from '@me/map';
@@ -22,9 +22,7 @@ export function ColorPicker({ value, isDefault, onChange, onReset, isDisabled }:
       ))}
       {!isDefault ? (
         <Tooltip content="Use the default colour">
-          <Button iconOnly size="xs" variant="ghost" tone="neutral" aria-label="Use the default colour" isDisabled={isDisabled ?? false} onClick={onReset}>
-            <RotateCcw size={14} />
-          </Button>
+          <IconButton icon={RotateCcw} size="Small" isHighlighted accessibilityLabel="Use the default colour" isDisabled={isDisabled ?? false} onClick={onReset} />
         </Tooltip>
       ) : null}
     </div>

@@ -237,7 +237,7 @@ export function PromoteModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       geo_shape: shape,
       geo_details: {
         type,
-        label: name.trim().toUpperCase(),
+        label: name.trim(),
         status: 'active',
         ...(type === 'geofence' ? { watch } : {}),
         ...(note.trim() ? { note: note.trim() } : {}),
@@ -274,10 +274,11 @@ export function PromoteModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
           <div className="bs-form__wide">
           <TextInput label="Name" value={name} onChange={({ value }) => setName(value ?? '')} placeholder={type === 'geofence' ? 'Coastal watch box' : 'Name on the map'} isRequired necessityIndicator="required" maxCharacters={40} autoFocus {...(error ? { validationState: 'error' as const, errorText: error } : {})} />
           </div>
-          {types.length > 1 ? <Pick label="Type" value={type} options={types.map((x) => ({ id: x, label: TYPE_WORD[x] ?? x }))} onChange={setType} /> : null}
-          {type === 'geofence' ? <Pick label="Alert on" value={watch} options={WATCH} onChange={setWatch} /> : null}
+          {/* One column: each choice is as wide as Name and Note above and below it. */}
+          {types.length > 1 ? <div className="bs-form__wide"><Pick label="Type" value={type} options={types.map((x) => ({ id: x, label: TYPE_WORD[x] ?? x }))} onChange={setType} /></div> : null}
+          {type === 'geofence' ? <div className="bs-form__wide"><Pick label="Alert on" value={watch} options={WATCH} onChange={setWatch} /></div> : null}
           {/* Only once the operator has made a layer: otherwise everything is in "Operator objects". */}
-          {opLayers.length ? <Pick label="Layer" value={layer} options={[{ id: 'none', label: 'Operator objects' }, ...opLayers.map((l) => ({ id: l.entity_id, label: l.aliases?.name ?? l.entity_id }))]} onChange={setLayer} /> : null}
+          {opLayers.length ? <div className="bs-form__wide"><Pick label="Layer" value={layer} options={[{ id: 'none', label: 'Operator objects' }, ...opLayers.map((l) => ({ id: l.entity_id, label: l.aliases?.name ?? l.entity_id }))]} onChange={setLayer} /></div> : null}
           <div className="bs-form__wide">
           <TextInput label="Note" value={note} onChange={({ value }) => setNote(value ?? '')} placeholder="Optional" maxCharacters={120} />
           </div>

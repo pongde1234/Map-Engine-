@@ -143,7 +143,7 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
       location: { lon: VP[0], lat: VP[1], hae: 0 },
       mil_view: { identity: 'friend', environment: 'land', sidc: CLASSES.refinery!.sidc, context: 'reality' },
       geo_shape: { type: 'circle', center: VP, radius_m: 3200 },
-      geo_details: { type: 'vp', tier: 1, label: 'VP · REFINERY COMPLEX', status: 'active' },
+      geo_details: { type: 'vp', tier: 1, label: 'VP · Refinery complex', status: 'active' },
       indicators: { notional: true },
     } satisfies EntityComponents,
   });
@@ -159,7 +159,7 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
         location: { lon: u.at[0], lat: u.at[1], hae: 0 },
         mil_view: { identity: 'friend', environment: 'land', sidc: CLASSES.process_unit!.sidc, context: 'reality' },
         geo_shape: { type: 'circle', center: u.at, radius_m: u.halfSizeM },
-        geo_details: { type: 'vp', tier: u.tier, label: u.name.toUpperCase(), status: 'active' },
+        geo_details: { type: 'vp', tier: u.tier, label: u.name, status: 'active' },
         // Phase 0: the RIL-reviewed rank and every unit's protective interlock in service (synthetic).
         plant: { unit: u.name, tier: u.tier, rank: u.rank, state: 'running', interlock: 'armed' },
         relationships: [{ type: 'member_of', target: 'VP-RIL' }],
@@ -177,7 +177,7 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
       payload: {
         ontology: { template: 'geo', class: 'ring' },
         geo_shape: { type: 'circle', center: VP, radius_m: ring.outer, ...(ring.inner ? { inner_radius_m: ring.inner } : {}) },
-        geo_details: { type: 'ring', ring: ring.id, label: `${ring.label} · ${ring.outer / 1000}–${ring.inner / 1000} KM`, status: 'active' },
+        geo_details: { type: 'ring', ring: ring.id, label: `${ring.label} · ${ring.outer / 1000}–${ring.inner / 1000} km`, status: 'active' },
       } satisfies EntityComponents,
     });
   }
@@ -504,7 +504,7 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
     payload: {
       ontology: { template: 'geo', class: 'rule_set' },
       aliases: { name: 'Delegation triggers (DP-0)' },
-      geo_details: { type: 'annotation', label: 'DELEGATION TRIGGERS · N, T UNSPECIFIED', status: 'active' },
+      geo_details: { type: 'annotation', label: 'Delegation triggers · N, T unspecified', status: 'active' },
     } satisfies EntityComponents,
   });
 
@@ -856,7 +856,7 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
     payload: {
       ontology: { template: 'geo', class: 'sea_restriction' },
       geo_shape: { type: 'circle', center: TANKER_HOLD, radius_m: 9000 },
-      geo_details: { type: 'sea_restriction', label: 'TANKER HOLD AREA', status: 'active' },
+      geo_details: { type: 'sea_restriction', label: 'Tanker hold area', status: 'active' },
     } satisfies EntityComponents,
   });
   // Soft-kill (EW / GNSS denial) areas active once the raid is detected.
@@ -870,7 +870,7 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
       payload: {
         ontology: { template: 'geo', class: 'soft_kill_area' },
         geo_shape: { type: 'sector', center: VP, radius_m: 100_000, inner_radius_m: 78_000, az_start: az0, az_end: az1 },
-        geo_details: { type: 'soft_kill_area', label: `RF/GNSS DENIAL · ${eid}`, status: 'active' },
+        geo_details: { type: 'soft_kill_area', label: `RF/GNSS denial · ${eid}`, status: 'active' },
       } satisfies EntityComponents,
     });
   }
@@ -981,7 +981,7 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
     thread_id: TH_RAID,
     derived_from: [refs.raidDetected],
     releasability: REL_PLANT,
-    payload: { ontology: { template: 'geo', class: 'aimpoint' }, geo_shape: { type: 'point', coordinates: cdu.at }, geo_details: { type: 'aimpoint', label: 'PREDICTED AIMPOINT · CRUDE UNIT', tot: H + MINUTE, status: 'active' } } satisfies EntityComponents,
+    payload: { ontology: { template: 'geo', class: 'aimpoint' }, geo_shape: { type: 'point', coordinates: cdu.at }, geo_details: { type: 'aimpoint', label: 'Predicted aimpoint · crude unit', tot: H + MINUTE, status: 'active' } } satisfies EntityComponents,
   });
   E.emit('command', 'command', {
     entity_id: 'CM-AIM-2',
@@ -990,7 +990,7 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
     thread_id: TH_RAID,
     derived_from: [refs.raidDetected],
     releasability: REL_PLANT,
-    payload: { ontology: { template: 'geo', class: 'aimpoint' }, geo_shape: { type: 'point', coordinates: fcc.at }, geo_details: { type: 'aimpoint', label: 'PREDICTED AIMPOINT · CATALYTIC CRACKER', tot: H + 8 * MINUTE, status: 'active' } } satisfies EntityComponents,
+    payload: { ontology: { template: 'geo', class: 'aimpoint' }, geo_shape: { type: 'point', coordinates: fcc.at }, geo_details: { type: 'aimpoint', label: 'Predicted aimpoint · catalytic cracker', tot: H + 8 * MINUTE, status: 'active' } } satisfies EntityComponents,
   });
   refs.dp8 = decision({
     t: advisoryT + 75 * SECOND,
@@ -1159,7 +1159,7 @@ export function generateJamnagar(opts: GenerateOptions = {}): { drafts: RecordDr
           source_time: tr - 5 * SECOND,
           provenance: P.rules,
           thread_id: TH_RAID,
-          payload: { ontology: { template: 'geo', class: 'debris_footprint' }, geo_shape: { type: 'ellipse', center: destination(at, inverse(at, cdu.at).azimuth_deg, distance(at, cdu.at) * 0.85), semi_major_m: 1400, semi_minor_m: 600, orientation_deg: posOf(th, tr).az }, geo_details: { type: 'debris_footprint', label: 'PREDICTED DEBRIS · OVER CRUDE UNIT', status: 'active' }, expiry_time: tk + 3 * MINUTE } satisfies EntityComponents,
+          payload: { ontology: { template: 'geo', class: 'debris_footprint' }, geo_shape: { type: 'ellipse', center: destination(at, inverse(at, cdu.at).azimuth_deg, distance(at, cdu.at) * 0.85), semi_major_m: 1400, semi_minor_m: 600, orientation_deg: posOf(th, tr).az }, geo_details: { type: 'debris_footprint', label: 'Predicted debris · over crude unit', status: 'active' }, expiry_time: tk + 3 * MINUTE } satisfies EntityComponents,
         });
         const rf = ruleFire(tr, { rule_id: 'R-DEBRIS', rule: 'debris_on_vp', state: 'fired', subject_ids: [th.id, 'PU-CDU'], note: 'Gun engagement refused: debris footprint covers a Tier-1 VP. Not the last chance to engage.' }, [fp]);
         engagement(tr, { effector_id: 'B-GUN1', target_id: th.id, weapon: 'radar-cued gun', result: 'refused', authority_record: auth, note: 'Debris would fall on the crude unit.' }, [rf]);

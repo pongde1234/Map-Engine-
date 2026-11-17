@@ -1,6 +1,6 @@
 /**
- * An object's header, read top to bottom: its name, with a status dot before it when it has one (and an aside at the right,
- * such as the picture time); a status line — the state word in its colour, then the figures that
+ * An object's header, read top to bottom: its name, with a status dot before it when it has one (and a trailing control
+ * at the right, such as an icon button); a status line — the state word in its colour, then the figures that
  * qualify it; a relation line, "this → that", each side a figure, its word and one line beneath;
  * then a row of equal-width actions. FDS parts only (Indicator, Metric, lucide icons, Buttons
  * passed in as actions).
@@ -30,7 +30,7 @@ const strong = (ink: Ink): string => typeClass(ink === 'negative' || ink === 'no
 export function ObjectHead({
   dot,
   title,
-  aside,
+  trailing,
   state,
   parts = [],
   from,
@@ -40,7 +40,8 @@ export function ObjectHead({
   /** A status dot before the name, in the state's colour. */
   dot?: DotColor;
   title: string;
-  aside?: ReactNode;
+  /** At the right of the title row, as given (an icon button). */
+  trailing?: ReactNode;
   state?: { word: string; ink: Ink };
   parts?: HeadPart[];
   from?: HeadSide;
@@ -52,7 +53,7 @@ export function ObjectHead({
       <div className="bs-head__title">
         {dot ? <Indicator color={dot} emphasis="Intense" size="Medium" aria-hidden /> : null}
         <span className={`${typeClass('section')} bs-ellipsis`}>{title}</span>
-        {aside ? <span className={`${typeClass('caption', 'muted')} bs-num bs-head__aside`}>{aside}</span> : null}
+        {trailing ? <span className="bs-head__aside">{trailing}</span> : null}
       </div>
       {state || parts.length ? (
         <p className="bs-head__status">
@@ -87,9 +88,9 @@ function Side({ side }: { side: HeadSide }) {
         {side.icon}
       </span>
       <span className="bs-head__sidetext">
-        {/* The figure leads at Metric Heading Small (the Target Board strip's size); its word stays at row size. */}
+        {/* The figure leads in semibold at 16px (the console's largest size); its word stays at row size. */}
         <span className="bs-head__fig">
-          <Metric type="Heading" size="Small" weight="Semibold" value={side.figure} suffix="none" color="Neutral" />
+          <Metric type="Body" size="Large" weight="Semibold" value={side.figure} suffix="none" color="Neutral" />
           <span className={`${typeClass('row')} bs-ellipsis`}>{side.label}</span>
         </span>
         {side.sub ? <span className={`${typeClass('caption', side.sub.ink ?? 'secondary')} bs-num bs-ellipsis`}>{side.sub.text}</span> : null}

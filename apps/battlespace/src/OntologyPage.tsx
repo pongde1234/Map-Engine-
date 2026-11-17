@@ -1,6 +1,6 @@
 /**
  * Ontology Explorer (storyboard A2): "Each assessment keeps the reports that produced it."
- *   - Theater State Model: the five layers (reference, observation, fused, command, event) at the
+ *   - Theatre State Model: the five layers (reference, observation, fused, command, event) at the
  *     replay position, each with its groups.
  *   - Lineage graph for A1's source record and the phase-0 preparation records, linked only by what
  *     the records carry (thread, derived from, protects, member of); nodes coloured by permission
@@ -35,7 +35,7 @@ import {
 import { ChevronDown, MapPinned } from 'lucide-react';
 import { Handle, MarkerType, PanOnScrollMode, Position, ReactFlow, ViewportPortal, getBezierPath, type Edge, type Node, type NodeProps } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { ROLES, formatZulu, type Entity, type JournalRecord, type RaidClock } from '@me/schema';
+import { DEFAULT_LABEL, ROLES, formatZulu, type Entity, type JournalRecord, type RaidClock } from '@me/schema';
 import { useClient, useClientTick, useEngineTime, useLineage, useView, useViewStore } from '@me/map-react';
 import {
   Facts,
@@ -60,9 +60,9 @@ import type { Presenter } from './presenter.ts';
 type BadgeColor = 'Positive' | 'Notice' | 'Negative' | 'Neutral' | 'Information';
 
 const PERMISSION: Record<Permission, { label: string; color: BadgeColor }> = {
-  all: { label: 'PERMITTED', color: 'Positive' },
-  some: { label: 'PARTLY PERMITTED', color: 'Notice' },
-  none: { label: 'NOT PERMITTED', color: 'Neutral' },
+  all: { label: 'Permitted', color: 'Positive' },
+  some: { label: 'Partly permitted', color: 'Notice' },
+  none: { label: 'Not permitted', color: 'Neutral' },
 };
 const EDGE_WORDS = ['derived from', 'thread', 'protects', 'member of'] as const;
 const slug = (s: string) => s.replace(/\s+/g, '-');
@@ -187,22 +187,21 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
         </Button>
         <span className="bs-fill" />
         {frame ? <Badge size="Small" color="Neutral" emphasis="Subtle" label={frame.id} /> : null}
-        <Badge size="Small" color="Information" emphasis="Subtle" label={`PICTURE ${clock ? raidLabel(t, clock) : formatZulu(t).slice(0, 5)}`} />
-        <Badge size="Small" color="Neutral" emphasis="Intense" label="SYNTHETIC" />
+        {/* The picture time and Synthetic are at the right of the console's tab strip, as on every view. */}
       </div>
 
-      <aside className="sv__rail" aria-label="Theater State Model">
+      <aside className="sv__rail" aria-label="Theatre State Model">
         <ScrollArea className="bs-scroll" viewportClassName="bs-scroll__viewport">
           <div className="sv__railbody">
-            <span className={typeClass('section')}>Theater state model · five layers</span>
+            <span className={typeClass('section')}>Theatre state model · five layers</span>
             {/* The five layers as the app's one list row (FDS ActionListItem): the layer, its groups beneath, its count at the end. */}
-            <ActionList accessibilityLabel="Layers of the Theater State Model">
+            <ActionList isFlush accessibilityLabel="Layers of the Theatre State Model">
               {layers.map((l) => (
                 <ActionListItem
                   key={l.layer}
                   value={l.layer}
                   title={l.label}
-                  description={`${l.groups.length ? l.groups.map((g) => `${g.label} ${g.count}`).join(' · ') : 'None at this position'}${l.layer === 'fused' ? ' · truth + noise, not recomputed from the log in this build' : ''}`}
+                  description={`${l.groups.length ? l.groups.map((g) => `${g.label} ${g.count}`).join(' · ') : 'None at this position'}`}
                   trailing={<ActionListItemText>{String(l.count)}</ActionListItemText>}
                 />
               ))}
@@ -237,7 +236,7 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
             <div className="tb-check">
               <div className="tb-check__head">
                 <span className={typeClass('section')}>Rehearsal inset · conflicting radar reports</span>
-                <Badge className="bs-tag" size="Small" color="Neutral" emphasis="Intense" label="REHEARSAL" />
+                <Badge className="bs-tag" size="Small" color="Neutral" emphasis="Intense" label="Rehearsal" />
               </div>
               {rehearsal.reports.length ? (
                 <>
@@ -262,7 +261,7 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
                         titleRole="subhead"
                         items={[
                           ['Hypotheses', rehearsal.assessment.hypotheses.map((h) => `${h.label} ${Math.round(h.p * 100)}%`).join(' · '), 'wide'],
-                          ['State', <Badge className="bs-tag" size="Small" color={rehearsal.assessment.contested ? 'Notice' : 'Positive'} emphasis="Subtle" label={rehearsal.assessment.contested ? 'CONTESTED' : 'RESOLVED'} />, 'wide'],
+                          ['State', <Badge className="bs-tag" size="Small" color={rehearsal.assessment.contested ? 'Notice' : 'Positive'} emphasis="Subtle" label={rehearsal.assessment.contested ? 'Contested' : 'Resolved'} />, 'wide'],
                           ['Derived from', `${rehearsal.assessment.derivedFrom.length} radar reports`, 'wide'],
                           ['Record', shortHash(rehearsal.assessment.hash)],
                         ]}
@@ -282,8 +281,23 @@ export function OntologyPage({ presenter, onOpenOnMap }: { presenter: Presenter;
       </ScrollArea>
 
       <aside className="sv__record" aria-label="Ontology inspector">
+        {/* The selected node's head, as the Battlespace and Targets panels have it: its layer, its name and who may see
+            it, above the tabs; the tabs hold what is read about it. */}
+        {node ? (
+          <div className="bs-insp__head">
+            <span className="BodySmallMedium bs-muted bs-ellipsis bs-num">{`${LAYER_WORD[node.layer]} layer · ${node.detail}`}</span>
+            <div className="bs-insp__title">
+              <span className={`${typeClass('title')} bs-ellipsis`} title={node.label}>{node.label}</span>
+            </div>
+            {node.permitted !== 'all' ? (
+              <div className="bs-insp__chips">
+                <Badge size="Small" color={PERMISSION[node.permitted].color} emphasis="Subtle" label={PERMISSION[node.permitted].label} />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <Tabs className="bs-tabs-fill" value={tab} onChange={setTab} size="Small" variant="filled">
-          <div className="bs-tabbar bs-tabbar--insp">
+          <div className={node ? 'bs-tabbar bs-tabbar--insp' : 'bs-tabbar'}>
             <TabList>
               <TabItem value="inspector">Inspector</TabItem>
               <TabItem value="history">History</TabItem>
@@ -338,10 +352,10 @@ const INSET = 4;
 
 /** Each link type's look: colour from the FDS tokens, a pattern of its own. */
 const EDGE_STYLE: Record<string, { stroke: string; dash?: string }> = {
-  'derived from': { stroke: 'var(--text-brand-normal)' },
-  thread: { stroke: 'var(--text-notice-normal)', dash: '6 4' },
-  protects: { stroke: 'var(--text-positive-normal)', dash: '1 5' },
-  'member of': { stroke: 'var(--text-neutral-normal)', dash: '1 5' },
+  'derived from': { stroke: 'var(--border-brand-default)' },
+  thread: { stroke: 'var(--border-notice-default)', dash: '6 4' },
+  protects: { stroke: 'var(--border-positive-default)', dash: '1 5' },
+  'member of': { stroke: 'var(--border-neutral-highlighted)', dash: '1 5' },
 };
 
 interface CardData extends Record<string, unknown> {
@@ -451,7 +465,7 @@ function Graph({ g, active, onPick }: { g: OntologyGraph; active: string | null;
       const a = layout.col.get(e.from);
       const b = layout.col.get(e.to);
       if (a === undefined || b === undefined) return [];
-      const look = EDGE_STYLE[e.type] ?? { stroke: 'var(--text-neutral-normal)' };
+      const look = EDGE_STYLE[e.type] ?? { stroke: 'var(--border-neutral-highlighted)' };
       // Left to right; the arrow sits at whichever end is the record derived.
       const [from, to] = a <= b ? [e.from, e.to] : [e.to, e.from];
       const arrow = e.type === 'derived from' ? { type: MarkerType.ArrowClosed, color: look.stroke, width: 14, height: 14 } : undefined;
@@ -560,12 +574,9 @@ function Inspector({ node, lineage, clock, root, onFocus }: { node: GraphNode; l
     return (
       <div role="group" aria-label={node.label}>
         <div className="tb-check">
-          <div className="tb-check__head">
-            <span className={`${typeClass('title')} bs-ellipsis`}>{node.label}</span>
-            {node.permitted !== 'all' ? <Badge className="bs-tag" size="Small" color={PERMISSION[node.permitted].color} emphasis="Subtle" label={PERMISSION[node.permitted].label} /> : null}
-          </div>
-          <span className={`${typeClass('caption', 'secondary')} bs-num`}>{`${LAYER_WORD[node.layer]} layer · ${node.detail} · prepared before the raid`}</span>
-          <ActionList accessibilityLabel={`${node.label} members`}>
+          {/* Its name and layer are in the panel's head. */}
+          <span className={typeClass('caption', 'secondary')}>Prepared before the raid</span>
+          <ActionList isFlush accessibilityLabel={`${node.label} members`}>
             {members.map((m) => (
               <ActionListItem
                 key={m.entity_id}
@@ -588,11 +599,7 @@ function Inspector({ node, lineage, clock, root, onFocus }: { node: GraphNode; l
   return (
     <div role="group" aria-label={`${node.label} envelope`}>
       <div className="tb-check">
-        <div className="tb-check__head">
-          <span className={`${typeClass('title')} bs-ellipsis`}>{node.label}</span>
-          {node.permitted !== 'all' ? <Badge className="bs-tag" size="Small" color={PERMISSION[node.permitted].color} emphasis="Subtle" label={PERMISSION[node.permitted].label} /> : null}
-        </div>
-        <span className={`${typeClass('caption', 'secondary')} bs-num`}>{`${LAYER_WORD[node.layer]} layer · ${node.detail}`}</span>
+        {/* Its name, layer and permission are in the panel's head. */}
         <Facts
           title="Envelope"
           flush
@@ -630,18 +637,20 @@ function History({ node, lineage, clock }: { node: GraphNode; lineage: JournalRe
   return (
     <div role="group" aria-label={`${node.label} history`}>
       <div className="tb-check">
-        <div className="tb-check__head">
-          <span className={`${typeClass('section')} bs-ellipsis`}>{`History · ${node.label}`}</span>
+        <div className="tb-check__head tb-check__head--inline">
+          <span className={typeClass('section')}>Records</span>
           <Counter value={rows.length} max={999} size="Medium" color="Neutral" emphasis="Subtle" accessibilityLabel={`${rows.length} record${rows.length === 1 ? '' : 's'}`} />
         </div>
-        <ActionList accessibilityLabel="Records">
+        <ActionList isFlush accessibilityLabel="Records">
           {rows.map((r) => (
             <ActionListItem
               key={r.record_id}
               value={r.record_id}
               title={r.kind === 'decision' || r.kind === 'engagement' || r.kind === 'bda' ? eventSummary(r).title : `${LAYER_WORD[r.layer as keyof typeof LAYER_WORD] ?? r.layer} record`}
               description={`${stamp(r.ingest_time, clock)} · ${r.provenance.source_feed}${r.derived_from?.length ? ` · derived from ${r.derived_from.length}` : ''} · ${shortHash(r.hash)}`}
-              titleSuffix={<ActionListItemBadge className="bs-tag" size="Small" color="Neutral" emphasis="Subtle" label={r.label} />}
+              // The marking is named only where it differs from the run's default (SYNTHETIC//DEMO on every row says
+              // nothing): a rehearsal record still stands out. The record's details and the evidence pack keep it.
+              {...(r.label && r.label !== DEFAULT_LABEL ? { titleSuffix: <ActionListItemBadge className="bs-tag" size="Small" color="Neutral" emphasis="Subtle" label={r.label} /> } : {})}
             />
           ))}
         </ActionList>

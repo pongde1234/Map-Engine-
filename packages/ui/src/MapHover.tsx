@@ -12,7 +12,7 @@ import type { MapClient } from '@me/client';
 import { useClient, useEngineTime, useView } from '@me/map-react';
 import { Facts, type Fact } from './Facts.tsx';
 import { GEO_WORD, entityTitle, kindWord, shapeSummary } from './Inspector.tsx';
-import { raidLabel } from './format.ts';
+import { axisWord, raidLabel, sentence } from './format.ts';
 import { typeClass } from './type.ts';
 
 /** Facts shown at most: a glance, not the record. */
@@ -82,9 +82,6 @@ export function MapHover() {
   );
 }
 
-/** A record's word as text: first letter up, underscores as spaces ("down" → "Down"). */
-const sentence = (w: string) => w.charAt(0).toUpperCase() + w.slice(1).replaceAll('_', ' ');
-
 /** The facts that say most about this kind of object at a glance, most useful first. */
 function hoverFacts(e: Entity, client: MapClient, t: number): Fact[] {
   const center = (client.scenario?.center ?? null) as [number, number] | null;
@@ -102,7 +99,7 @@ function hoverFacts(e: Entity, client: MapClient, t: number): Fact[] {
     e.location?.hae !== undefined && e.ontology?.template === 'track' && ['Altitude', `${Math.round(e.location.hae)} m`],
     moving && e.ontology?.template === 'track' && ['Heading', `${String(Math.round(headingSpeed(vel).heading) % 360).padStart(3, '0')}°`],
     e.group && ['Members', String(e.group.members.length)],
-    (e.track?.axis ?? e.group?.axis) && ['Axis · wave', `${e.track?.axis ?? e.group?.axis} · ${e.track?.wave ?? e.group?.wave ?? '—'}`],
+    (e.track?.axis ?? e.group?.axis) && ['Axis · wave', `${axisWord((e.track?.axis ?? e.group?.axis)!)} · ${e.track?.wave ?? e.group?.wave ?? '—'}`],
     // Fire units.
     e.effector && ['Status', sentence(e.effector.status)],
     e.effector && ['Channels', `${e.effector.channels.busy} / ${e.effector.channels.total}`],

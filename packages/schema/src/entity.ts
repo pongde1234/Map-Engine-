@@ -172,7 +172,7 @@ export const GeoDetails = z.object({
   /** Vulnerable-point tier (1 = most critical). */
   tier: z.number().int().min(1).max(3).optional(),
   status: z.enum(['draft', 'proposed', 'active', 'expired']).default('active'),
-  /** Free label shown on the map, e.g. "R3 MIDDLE", "AXIS NORTH". */
+  /** Free label shown on the map, e.g. "R3 middle", "Axis north". */
   label: z.string().optional(),
   /** Altitude band for airspace shapes, metres. */
   alt_min_m: z.number().optional(),

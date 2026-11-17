@@ -12,7 +12,7 @@
  * force and who holds authority. Each is a focus of the same read-only tools (assistant.ts
  * AssistantFocus), with its own prompts; switching agent starts a new chat.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@faclon-labs/fds';
 import { ClipboardList, Gavel, MapPinned } from 'lucide-react';
 import { formatZulu } from '@me/schema';
@@ -73,12 +73,18 @@ export function AssistantPanel({
   onOpenOnMap,
   pending,
   onPendingTaken,
+  userName,
+  footnote,
 }: {
   isOpen: boolean;
   onDismiss: () => void;
   onOpenOnMap: (id: string) => void;
   pending?: string | null;
   onPendingTaken?: () => void;
+  /** Rendered outside the shell's profile, so the host passes who to greet. */
+  userName?: string;
+  /** The host's line under the message box. */
+  footnote?: ReactNode;
 }) {
   const client = useClient();
   const derived = useDerived(1000);
@@ -151,7 +157,7 @@ export function AssistantPanel({
       // "+" stays in the header, disabled until a chat is under way.
       onNewChat={() => (stop(), setMsgs([]))}
       hasChat={msgs.length > 0}
-      footer={<AiComposer onSubmit={({ text }) => ask(text)} onStop={stop} status={status} value={draft} onChange={setDraft} placeholder={preview ?? agent.placeholder} accessibilityLabel="Ask the assistant" />}
+      footer={<AiComposer onSubmit={({ text }) => ask(text)} onStop={stop} status={status} value={draft} onChange={setDraft} placeholder={preview ?? agent.placeholder} accessibilityLabel="Ask the assistant" footnote={footnote} />}
     >
       {msgs.length ? (
         <AiConversation status={status} accessibilityLabel="Conversation with the assistant">
@@ -186,6 +192,7 @@ export function AssistantPanel({
       ) : (
         <AiDrawerHome
           // The mark, the name and the line under it come from the current agent (AGENTS).
+          userName={userName}
           suggestions={suggestions}
           onSuggestionPick={(s) => setDraft(s.label)}
           onSuggestionPreview={(s) => setPreview(s?.label ?? null)}

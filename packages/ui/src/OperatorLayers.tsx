@@ -65,7 +65,7 @@ export function LayerEntryModal({ isOpen, layerId, onClose }: { isOpen: boolean;
     setError(null);
     const payload: EntityComponents = {
       aliases: { name: name.trim() },
-      geo_details: { type: 'layer', label: name.trim().toUpperCase(), status: 'active', ...(note.trim() ? { note: note.trim() } : {}) },
+      geo_details: { type: 'layer', label: name.trim(), status: 'active', ...(note.trim() ? { note: note.trim() } : {}) },
     };
     try {
       await client.publish({ payload });

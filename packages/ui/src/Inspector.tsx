@@ -18,6 +18,7 @@ import {
   ActionListSection,
   Badge,
   Button,
+  IconButton,
   Card,
   Modal,
   ModalBody,
@@ -51,7 +52,7 @@ import { Section } from './Section.tsx';
 import type { Derived } from './derived.ts';
 import { useHealth } from './health.ts';
 import { AGE_BADGE, AGE_WORD, ageLabel } from './age.ts';
-import { eventSummary, raidLabel, shortHash } from './format.ts';
+import { axisWord, eventSummary, raidLabel, sentence, shortHash } from './format.ts';
 import { typeClass } from './type.ts';
 
 const IDENTITY_COLOR = { hostile: 'Negative', suspect: 'Notice', unknown: 'Notice', pending: 'Neutral', friend: 'Information', assumed_friend: 'Information', neutral: 'Positive' } as const;
@@ -59,7 +60,7 @@ const IDENTITY_COLOR = { hostile: 'Negative', suspect: 'Notice', unknown: 'Notic
 const KIND_ICON = { fragment: FileSearch, decision: Gavel, rule_fire: TriangleAlert, engagement: Crosshair, bda: ShieldAlert, correction: Wrench } as const;
 
 const LIKELIHOOD = (p: number): { word: string; color: 'Notice' | 'Neutral' } =>
-  p >= 0.8 ? { word: 'HIGHLY LIKELY', color: 'Notice' } : p >= 0.55 ? { word: 'LIKELY', color: 'Notice' } : p >= 0.3 ? { word: 'POSSIBLE', color: 'Neutral' } : { word: 'UNLIKELY', color: 'Neutral' };
+  p >= 0.8 ? { word: 'Highly likely', color: 'Notice' } : p >= 0.55 ? { word: 'Likely', color: 'Notice' } : p >= 0.3 ? { word: 'Possible', color: 'Neutral' } : { word: 'Unlikely', color: 'Neutral' };
 
 const QUALIFIER: Partial<Record<string, string>> = { suspect: ' (suspected)', unknown: ' (unidentified)', pending: ' (pending)', assumed_friend: ' (assumed friend)' };
 
@@ -73,7 +74,7 @@ export function entityTitle(e: Entity): string {
     const label = e.classification?.hypotheses[0]?.label ?? cls.label;
     return `${label}${QUALIFIER[e.mil_view?.identity ?? ''] ?? ''}`;
   }
-  // Command objects read by their map label ("R4 OUTER · 150–60 KM"), not their id.
+  // Command objects read by their map label ("R4 outer · 150–60 km"), not their id.
   return e.aliases?.name ?? e.geo_details?.label ?? cls?.label ?? e.entity_id;
 }
 
@@ -81,16 +82,14 @@ export function entityTitle(e: Entity): string {
 export interface InspectorHandover {
   onNominate?: (id: string) => void;
   onAsk?: (question: string) => void;
-  /** Open the Target Board (the Theatre card's first action). */
-  onOpenBoard?: () => void;
 }
 
-export function Inspector({ derived, onNominate, onAsk, onOpenBoard }: { derived: Derived } & InspectorHandover) {
+export function Inspector({ derived, onNominate, onAsk }: { derived: Derived } & InspectorHandover) {
   const e = useSelectedEntity();
   return e ? (
     <EntityInspector e={e} derived={derived} {...(onNominate ? { onNominate } : {})} {...(onAsk ? { onAsk } : {})} />
   ) : (
-    <TheatreSummary derived={derived} {...(onAsk ? { onAsk } : {})} {...(onOpenBoard ? { onOpenBoard } : {})} />
+    <TheatreSummary derived={derived} />
   );
 }
 
@@ -161,9 +160,7 @@ function EntityInspector({ e, derived, onNominate, onAsk }: { e: Entity; derived
             {ref} · {kindWord(e)}
           </span>
           <Tooltip content="Clear selection (Esc)">
-            <Button iconOnly variant="ghost" tone="neutral" size="xs" aria-label="Clear selection" onClick={() => view.set({ selected: null, highlight: [] })}>
-              <X size={14} />
-            </Button>
+            <IconButton icon={X} size="Small" isHighlighted accessibilityLabel="Clear selection" onClick={() => view.set({ selected: null, highlight: [] })} />
           </Tooltip>
         </div>
         <div className="bs-insp__title">
@@ -174,18 +171,18 @@ function EntityInspector({ e, derived, onNominate, onAsk }: { e: Entity; derived
           <span className={`${typeClass('title')} bs-ellipsis`}>{entityTitle(e)}</span>
         </div>
         <div className="bs-insp__chips">
-          {e.classification?.contested ? <Badge size="Small" color="Neutral" emphasis="Intense" label="CONTESTED" /> : null}
-          {e.mil_view ? <Badge size="Small" color={IDENTITY_COLOR[e.mil_view.identity]} emphasis="Subtle" label={e.mil_view.identity.replace('_', ' ').toUpperCase()} /> : null}
+          {e.classification?.contested ? <Badge size="Small" color="Neutral" emphasis="Intense" label="Contested" /> : null}
+          {e.mil_view ? <Badge size="Small" color={IDENTITY_COLOR[e.mil_view.identity]} emphasis="Subtle" label={sentence(e.mil_view.identity)} /> : null}
           {e.track?.state && e.track.state !== 'detected' && e.track.state !== 'inbound' ? (
-            <Badge size="Small" color={e.track.state === 'destroyed' ? 'Positive' : 'Notice'} emphasis="Subtle" label={e.track.state.toUpperCase()} />
+            <Badge size="Small" color={e.track.state === 'destroyed' ? 'Positive' : 'Notice'} emphasis="Subtle" label={sentence(e.track.state)} />
           ) : null}
           {commandObject ? (
             // Command objects do not age: they hold until withdrawn or expired.
-            <Badge size="Small" color={e.geo_details?.status === 'active' ? 'Positive' : 'Neutral'} emphasis="Subtle" label={(e.geo_details?.status ?? 'active').toUpperCase()} />
+            <Badge size="Small" color={e.geo_details?.status === 'active' ? 'Positive' : 'Neutral'} emphasis="Subtle" label={sentence(e.geo_details?.status ?? 'active')} />
           ) : (
-            <Badge size="Small" color={AGE_BADGE[age]} emphasis="Subtle" label={age === 'disc' ? 'DISC · NO LINK' : `${AGE_WORD[age]} · ${ageLabel(ageMs)}`} />
+            <Badge size="Small" color={AGE_BADGE[age]} emphasis="Subtle" label={age === 'disc' ? 'Disc · no link' : `${AGE_WORD[age]} · ${ageLabel(ageMs)}`} />
           )}
-          {operatorObject ? <Badge size="Small" color="Information" emphasis="Subtle" label="DRAWN" /> : null}
+          {operatorObject ? <Badge size="Small" color="Information" emphasis="Subtle" label="Drawn" /> : null}
         </div>
       </div>
       <Tabs key={tabs.join()} className="bs-tabs-fill" defaultValue={first} size="Small" variant="filled">
@@ -407,9 +404,9 @@ function overviewFacts(e: Entity, client: MapClient, derived: Derived, t: number
     e.location?.hae !== undefined && e.ontology?.template === 'track' && ['Altitude', `${Math.round(e.location.hae)} m`],
     !!vel && (vel.e !== 0 || vel.n !== 0) && ['Speed', `${Math.round(Math.hypot(vel.e, vel.n) * 3.6)} km/h`],
     !!vel && (vel.e !== 0 || vel.n !== 0) && ['Heading', `${String(Math.round(headingSpeed(vel).heading) % 360).padStart(3, '0')}°`],
-    e.track?.axis && ['Axis · wave', `${e.track.axis} · ${e.track.wave ?? '—'}`],
+    e.track?.axis && ['Axis · wave', `${axisWord(e.track.axis)} · ${e.track.wave ?? '—'}`],
     // Fire units.
-    e.effector && ['Status', <Badge size="Small" color={e.effector.status === 'down' ? 'Negative' : e.effector.status === 'engaging' ? 'Notice' : 'Positive'} emphasis="Subtle" label={e.effector.status.toUpperCase()} />],
+    e.effector && ['Status', <Badge size="Small" color={e.effector.status === 'down' ? 'Negative' : e.effector.status === 'engaging' ? 'Notice' : 'Positive'} emphasis="Subtle" label={sentence(e.effector.status)} />],
     e.effector && ['Channels', `${e.effector.channels.busy} / ${e.effector.channels.total} in use`],
     mag && [
       'Magazine',
@@ -432,19 +429,19 @@ function overviewFacts(e: Entity, client: MapClient, derived: Derived, t: number
     e.plant?.interlock && ['Interlock', e.plant.interlock],
     // Intel fragments.
     e.fragment && ['Source', e.fragment.source_kind.replaceAll('_', ' ')],
-    e.fragment && ['Confidence', <Badge size="Small" color={e.fragment.confidence === 'confirmed' ? 'Positive' : e.fragment.confidence === 'likely' ? 'Notice' : 'Neutral'} emphasis="Subtle" label={e.fragment.confidence.toUpperCase()} />],
-    e.fragment && ['Associated', e.fragment.associated ? 'Yes' : <Badge size="Small" color="Neutral" emphasis="Intense" label="UNASSOCIATED" />],
+    e.fragment && ['Confidence', <Badge size="Small" color={e.fragment.confidence === 'confirmed' ? 'Positive' : e.fragment.confidence === 'likely' ? 'Notice' : 'Neutral'} emphasis="Subtle" label={sentence(e.fragment.confidence)} />],
+    e.fragment && ['Associated', e.fragment.associated ? 'Yes' : <Badge size="Small" color="Neutral" emphasis="Intense" label="Unassociated" />],
     e.location_uncertainty && ['Uncertainty', `${(e.location_uncertainty.semi_major_m / 1000).toFixed(1)} × ${(e.location_uncertainty.semi_minor_m / 1000).toFixed(1)} km`],
     // Raid groups.
     e.group && ['Members', String(e.group.members.length)],
-    e.group?.axis && ['Axis · wave', `${e.group.axis} · ${e.group.wave ?? '—'}`],
+    e.group?.axis && ['Axis · wave', `${axisWord(e.group.axis)} · ${e.group.wave ?? '—'}`],
     // Command objects.
     gd && e.geo_shape && ['Type', GEO_WORD[gd.type] ?? gd.type.replaceAll('_', ' ').replace(/^\w/, (c) => c.toUpperCase())],
     e.geo_shape && ['Size', shapeSummary(e.geo_shape)],
     gd?.ring && ['Ring', gd.ring],
     // A predicted aimpoint's time on target is a forecast, counted from the picture time.
     gd?.tot !== undefined && ['Time on target', `${raidLabel(gd.tot, client.scenario?.clock)} · ${gd.tot > t ? `in ${Math.ceil((gd.tot - t) / 60_000)} min` : 'passed'} · forecast`, 'wide'],
-    gd?.wcs && ['Weapons control', <Badge size="Small" color={gd.wcs === 'free' ? 'Negative' : gd.wcs === 'tight' ? 'Notice' : 'Positive'} emphasis="Subtle" label={gd.wcs.toUpperCase()} />],
+    gd?.wcs && ['Weapons control', <Badge size="Small" color={gd.wcs === 'free' ? 'Negative' : gd.wcs === 'tight' ? 'Notice' : 'Positive'} emphasis="Subtle" label={sentence(gd.wcs)} />],
     gd?.tier !== undefined && !e.plant && ['Tier', `Tier ${gd.tier}`],
     gd?.watch && ['Alert on', gd.watch === 'any' ? 'Any track' : `${gd.watch[0]!.toUpperCase()}${gd.watch.slice(1)} tracks`],
     gd?.type === 'geofence' && e.geo_shape && ['Inside now', String(insideNow(client, e.geo_shape, gd.watch ?? 'hostile', t))],
@@ -458,11 +455,11 @@ function overviewFacts(e: Entity, client: MapClient, derived: Derived, t: number
 /** Hash-chain status as reported by the server's verification at load (not re-checked here). */
 function ChainBadge() {
   const h = useHealth();
-  if (!h) return <Badge size="Small" color="Neutral" emphasis="Subtle" label="CHECKING" />;
+  if (!h) return <Badge size="Small" color="Neutral" emphasis="Subtle" label="Checking" />;
   return h.chain.ok ? (
     <Tooltip content={`Server verified ${h.chain.checked.toLocaleString('en')} records at load · root ${shortHash(h.head.hash)}`}>
       <span>
-        <Badge size="Small" color="Positive" emphasis="Subtle" label="VERIFIED · SERVER" />
+        <Badge size="Small" color="Positive" emphasis="Subtle" label="Verified · server" />
       </span>
     </Tooltip>
   ) : (
@@ -670,11 +667,11 @@ function EntityActivity({ id, limit, hideEmpty = false }: { id: string; limit: n
   );
 }
 
-function TheatreSummary({ derived, onAsk, onOpenBoard }: { derived: Derived } & Pick<InspectorHandover, 'onAsk' | 'onOpenBoard'>) {
+function TheatreSummary({ derived }: { derived: Derived }) {
   return (
     <ScrollArea className="bs-scroll" viewportClassName="bs-scroll__viewport">
       <div className="bs-divided">
-        <TheatreCard derived={derived} {...(onAsk ? { onAsk } : {})} {...(onOpenBoard ? { onOpenBoard } : {})} />
+        <TheatreCard derived={derived} />
         <RaidGroups groups={derived.groups} />
         <FireUnits effectors={derived.effectors} />
       </div>

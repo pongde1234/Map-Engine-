@@ -161,7 +161,7 @@ export function LayerList({ derived }: { derived: Derived }) {
                           {/* The whole row is the toggle; the eye at its end shows the state. */}
                           <button type="button" className="bs-ll__hit" aria-pressed={on} aria-label={`${r.title}: ${on ? 'shown, click to hide' : 'hidden, click to show'}`} onClick={() => setOn([r.key], !on)}>
                             <span className="bs-ll__swatch" style={{ background: r.color }} aria-hidden />
-                            <span className={`${typeClass('label', on ? 'normal' : 'muted')} bs-ellipsis bs-ll__name`} title={r.title}>
+                            <span className={`${typeClass('item', on ? 'normal' : 'muted')} bs-ellipsis bs-ll__name`} title={r.title}>
                               {r.title}
                             </span>
                             <RowTrailing row={r} derived={derived} />

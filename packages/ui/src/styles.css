@@ -21,7 +21,8 @@
    gives the rest to the map. panels.ts reads the same rules (leftWidth, rightWidth). */
 :root {
   --bs-panel-w: clamp(calc(var(--spacing-64) * 5.5), 20vw, calc(var(--spacing-64) * 6.875));
-  --bs-panel-left-w: clamp(calc(var(--spacing-64) * 4.75), 18vw, calc(var(--spacing-64) * 6.25));
+  /* The two side panels are one width, so the map sits between equal panels. */
+  --bs-panel-left-w: var(--bs-panel-w);
   /* Corner radius of layouts, never of components (a Card, Button, Badge keep FDS's own).
      A surface that only holds other things takes one of two: a zone (a column, the page frame)
      is 4px, an inner region (timeline lanes, a hover row) 2px. Both sit below the 8px of the
@@ -70,6 +71,32 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+/* A phone (under 768px, STACK_BELOW in panels.ts): the map and its time bar first, then the inspector and the layers
+   panel below it at full width; the view scrolls, and each part keeps a height of its own for its inner scrolling. */
+@media (max-width: 767px) {
+  .bs-console {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .bs-console > * {
+    flex: none;
+  }
+  .bs-center {
+    order: -1;
+    height: 75vh;
+  }
+  /* The inspector first: it is what a tap on the map opens. */
+  .bs-left {
+    order: 1;
+  }
+  .bs-left,
+  .bs-right {
+    width: auto;
+    height: 80vh;
+    border-width: var(--border-width-thin) 0 0;
+  }
 }
 .bs-time {
   flex: none;
@@ -197,62 +224,17 @@
   align-items: center;
   gap: var(--spacing-6);
 }
-/* Raid groups (RaidGroups.tsx): number tiles in two columns, each a button with no fill and the
-   subtle border a card has. */
+/* Raid groups (RaidGroups.tsx): the flush list steps out by a row's 8px inset, so its text lines up with the
+   section heading. */
 .bs-rg {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--spacing-8);
+  margin-inline: calc(var(--spacing-8) * -1);
 }
-.bs-rg > * {
-  display: flex;
-  min-width: 0;
-}
-/* A tile fills its grid cell, and the cells in a row share one height. */
-.bs-rg__tile {
-  align-self: stretch;
-}
-.bs-rg__tile {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--spacing-4);
-  width: 100%;
-  min-width: 0;
-  margin: 0;
-  box-sizing: border-box;
-  padding: var(--spacing-12);
-  /* No fill, the subtle border every card has (the user's call). */
-  border: var(--border-width-thin) solid var(--border-neutral-default);
-  /* A tile stands in for an FDS Card, so it takes the card's 8px. */
-  border-radius: var(--radius-m); /* component */
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.bs-rg__tile:hover {
-  border-color: var(--border-neutral-highlighted);
-}
-.bs-rg__tile:focus-visible {
-  outline: var(--border-width-thick) solid var(--border-focused);
-  outline-offset: var(--spacing-2);
-}
-/* The count, then its unit on the same baseline. */
+/* A raid group row's count at its end, then its unit on the same baseline. */
 .bs-rg__fig {
   display: flex;
+  flex: none;
   align-items: baseline;
   gap: var(--spacing-4);
-}
-/* The name is one line, cut with an ellipsis (the full name is the hover text), so every tile in the
-   grid is the same height. */
-.bs-rg__name {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* A finished sketch's popover points at this spot on the map (the top of the shape). */
@@ -404,7 +386,7 @@
 }
 .bs-caption {
   opacity: 0;
-  transition: opacity 600ms ease;
+  transition: opacity var(--global-duration-xgentle) var(--global-easing-standard);
 }
 .bs-caption > * {
   pointer-events: none;
@@ -615,7 +597,7 @@
 }
 @media (prefers-reduced-motion: no-preference) {
   .bs-tl__card {
-    animation: bs-tl-in 120ms ease-out;
+    animation: bs-tl-in var(--global-duration-xquick) var(--global-easing-entrance);
   }
 }
 @keyframes bs-tl-in {
@@ -887,14 +869,11 @@
 /* One 12px gutter in every panel, left and right: a section, a filter bar and a tab strip sit 12px in,
    and so do a list row's icon and text and its tag at the end. FDS pads a list 8px and a row 8px (16
    in), so the list takes 4px and the row's own 8px makes the 12. */
-:is(.bs-left, .bs-right, .tb__detail, .sv__rail, .sv__record) .ds-action-list {
+:is(.bs-left, .bs-right, .tb__detail, .sv__rail, .sv__record) .ds-action-list:not(.ds-action-list--flush) {
   padding-inline: var(--spacing-4);
 }
-/* The Ontology panels already inset their content (the rail's body, the record's tab panel), so a list
-   there takes no padding of its own: its rows start at that inset. */
-:is(.sv__rail, .sv__record) .ds-action-list {
-  padding: 0;
-}
+/* The Ontology panels already inset their content (the rail's body, the record's tab panel): their lists are
+   ActionList isFlush (FDS ActionList R21), so their rows start at that inset. */
 /* A row's figure or tag at the end keeps its width: FDS lets it shrink (min-width 0), so beside a long
    description it was squeezed to a few pixels and its digits spilled out of the row. */
 :is(.bs-left, .bs-right, .tb__detail, .sv__rail, .sv__record) .ds-action-list-item__trailing {

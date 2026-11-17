@@ -21,7 +21,7 @@ import { CLASSES, type DecisionPayload, type EngagementPayload, type Entity, typ
 import { distance, pointInShape } from '@me/geo';
 import type { MapClient } from '@me/client';
 import { commitChannels, costWord, doctrineFits, doctrineRule, pairingFor, type Pairing } from './pairing.ts';
-import { shortHash } from './format.ts';
+import { axisWord, shortHash } from './format.ts';
 
 export type Stage = 'nominated' | 'identified' | 'prioritized' | 'paired' | 'approved' | 'executing' | 'assessed';
 
@@ -37,7 +37,7 @@ export const STAGES: Array<{ id: Stage; label: string; gate: string; hint: strin
 
 /** Columns are subtractive by role: each view keeps the stages that role acts on. */
 const ROLE_VIEW: Record<string, { label: string; stages?: Stage[] }> = {
-  planning: { label: 'PLANNING' },
+  planning: { label: 'Planning' },
   l1: { label: 'L1' },
   l2: { label: 'L2' },
   l3: { label: 'L3' },
@@ -99,7 +99,7 @@ export interface Target {
   pairing?: Pairing;
   /** Options pass the gates but their channels went to targets nearer the VP. */
   saturated: boolean;
-  /** Class, axis and wave, e.g. "One-way-attack drone · WEST · W2". */
+  /** Class, axis and wave, e.g. "One-way-attack drone · West · W2". */
   title: string;
   cls?: string;
   stage: Stage;
@@ -400,7 +400,7 @@ export function deriveTargets(client: MapClient, t: number, center: LonLat): Tar
 
     const name = cls?.label ?? (last ? `Engaged by ${last.payload.weapon}` : 'Track');
     const recFollow = pair?.followOn ?? null;
-    const where = [e?.track?.axis, e?.track?.wave].filter(Boolean).join(' · ');
+    const where = [e?.track?.axis && axisWord(e.track.axis), e?.track?.wave].filter(Boolean).join(' · ');
     out.push({
       id,
       ref: e?.aliases?.track_number ?? id,

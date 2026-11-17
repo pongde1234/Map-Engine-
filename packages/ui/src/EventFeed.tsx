@@ -39,7 +39,7 @@ const SEVERITY_FILTERS: Array<{ id: Severity; label: string; short: string }> = 
 ];
 
 // Low carries no tag: routine traffic stays quiet and the tagged rows stand out.
-const SEVERITY_BADGE = { high: { color: 'Negative', label: 'HIGH' }, medium: { color: 'Notice', label: 'MEDIUM' } } as const;
+const SEVERITY_BADGE = { high: { color: 'Negative', label: 'High' }, medium: { color: 'Notice', label: 'Medium' } } as const;
 
 interface Filter {
   min: Severity;

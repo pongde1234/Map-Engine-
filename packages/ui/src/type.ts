@@ -20,6 +20,7 @@ export type TextRole =
   | 'section' // a panel section's heading
   | 'subhead' // a heading inside a card or tile
   | 'row' // the title of a row
+  | 'item' // a name in a panel list that is not an FDS ActionList (the layers list): the panel rows' 14px / 500
   | 'value' // a fact's value
   | 'body' // a sentence of prose (a dialog's text)
   | 'label' // a field, tile or eyebrow label
@@ -36,6 +37,7 @@ export const TYPE: Record<TextRole, string> = {
   section: 'BodyLargeSemibold',
   subhead: 'BodyMediumMedium',
   row: 'BodyLargeMedium',
+  item: 'BodyMediumMedium',
   value: 'BodyMediumRegular bs-num',
   body: 'BodyLargeRegular',
   label: 'BodySmallMedium',
@@ -51,6 +53,7 @@ export const DEFAULT_INK: Record<TextRole, Ink> = {
   section: 'normal',
   subhead: 'normal',
   row: 'normal',
+  item: 'normal',
   value: 'normal',
   body: 'normal',
   label: 'muted',

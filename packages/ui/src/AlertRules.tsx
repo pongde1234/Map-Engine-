@@ -29,7 +29,7 @@ import type { MapClient } from '@me/client';
 import { BellRing } from 'lucide-react';
 import { useClient, useEngineTime, useEvents } from '@me/map-react';
 import { Review } from './Review.tsx';
-import { raidLabel } from './format.ts';
+import { raidLabel, sentence } from './format.ts';
 import { WATCH } from './sketch.ts';
 
 type Condition = AlertRule['condition'];
@@ -128,7 +128,7 @@ export function CustomAlertList({ onOpen }: { onOpen: (id: string) => void }) {
             title={e.aliases?.name ?? e.entity_id}
             description={`${alertSummary(rule, client)}${last !== undefined ? ` · ${raidLabel(last, clock)}` : ''}`}
             leading={<ActionListItemIcon icon={BellRing} />}
-            titleSuffix={<ActionListItemBadge className="bs-tag" size="Small" color={state === 'fired' ? SEVERITY_COLOR[rule.severity] : 'Neutral'} emphasis="Subtle" label={state === 'fired' ? 'FIRED' : state === 'clear' ? 'CLEAR' : 'ARMED'} />}
+            titleSuffix={<ActionListItemBadge className="bs-tag" size="Small" color={state === 'fired' ? SEVERITY_COLOR[rule.severity] : 'Neutral'} emphasis="Subtle" label={state === 'fired' ? 'Fired' : state === 'clear' ? 'Clear' : 'Armed'} />}
             onClick={() => onOpen(e.entity_id)}
           />
         ))}
@@ -213,7 +213,7 @@ export function AlertRuleModal({ isOpen, alertId, onClose }: { isOpen: boolean; 
     }
     setBusy(true);
     setError(null);
-    const payload: EntityComponents = { aliases: { name: name.trim() }, geo_details: { type: 'alert', label: name.trim().toUpperCase(), status: 'active' }, alert_rule: b.rule };
+    const payload: EntityComponents = { aliases: { name: name.trim() }, geo_details: { type: 'alert', label: name.trim(), status: 'active' }, alert_rule: b.rule };
     try {
       const rec = await client.publish({ payload });
       toast.show({ color: 'Positive', content: `Alert “${name.trim()}” armed. It fires from ${raidLabel(rec.ingest_time, clock)}.` });
@@ -246,9 +246,9 @@ export function AlertRuleModal({ isOpen, alertId, onClose }: { isOpen: boolean; 
         <ModalBody>
           <Review
             lead={alertSummary(rule, client)}
-            state={<Badge size="Small" color={alertState === 'fired' ? SEVERITY_COLOR[rule.severity] : 'Neutral'} emphasis="Subtle" label={alertState.toUpperCase()} />}
+            state={<Badge size="Small" color={alertState === 'fired' ? SEVERITY_COLOR[rule.severity] : 'Neutral'} emphasis="Subtle" label={sentence(alertState)} />}
             facts={[
-              ['Severity', <Badge size="Small" color={SEVERITY_COLOR[rule.severity]} emphasis="Subtle" label={rule.severity.toUpperCase()} />],
+              ['Severity', <Badge size="Small" color={SEVERITY_COLOR[rule.severity]} emphasis="Subtle" label={sentence(rule.severity)} />],
               ['Label', <Badge size="Small" color="Notice" emphasis="Subtle" label={existing.label} />],
               ['Set by', existing.geo_details?.author ?? '—'],
               ['Set at', raidLabel(existing.ingest_time, clock)],

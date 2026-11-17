@@ -3,7 +3,7 @@ import { AppShell, TabItem, TabList, TabPanel, Tabs, ThemeProvider, ToastContain
 import { Crosshair, Map as MapIcon, Network } from 'lucide-react';
 import { MapClient, createViewStore, syncAcrossWindows } from '@me/client';
 import { MapEngineProvider, useClient, useViewStore } from '@me/map-react';
-import { ConnectionBanner, IconTitles, TruncationTitles, useDerived } from '@me/ui';
+import { ConnectionBanner, IconTitles, StatusBadges, TruncationTitles, useDerived } from '@me/ui';
 import { BattlespacePage, type PanelState } from './BattlespacePage.tsx';
 import { DroppedCommands } from './DroppedCommands.tsx';
 import { fitPanels } from './panels.ts';
@@ -69,6 +69,10 @@ function Console() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+  // The map opens with both side panels, every time the Battlespace view is shown.
+  useEffect(() => {
+    if (page === 'battlespace') setPanels({ leftOpen: true, rightOpen: true });
+  }, [page, setPanels]);
   // Below 1600 px the docked assistant would leave the map too narrow: the layers panel steps
   // aside while it is open and comes back when it closes (unless the operator moved it meanwhile).
   const stepAside = useRef(false);
@@ -112,7 +116,6 @@ function Console() {
               setPage('targets');
             }}
             onAsk={ask}
-            onOpenBoard={() => setPage('targets')}
           />
         );
       case 'ontology':
@@ -173,6 +176,8 @@ function Console() {
               </TabItem>
             ))}
           </TabList>
+          {/* The picture time and Synthetic, in the same place on every view. */}
+          <StatusBadges />
         </div>
         {/* Only the open view is mounted: the map's engine and each view's fetches run while it is shown. */}
         {VIEWS.map((v) => (

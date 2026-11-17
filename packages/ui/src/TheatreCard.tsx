@@ -3,14 +3,15 @@
  * the theatre's state as a coloured word — SATURATED (hostile tracks in R3 past the fire
  * channels), LEAKERS (the forecast past its DP-6 threshold), ENGAGING (channels in use), INBOUND
  * (hostile tracks closing) or CLEAR — with the first impact; then hostile tracks → fire units,
- * closing beneath one and rounds ready beneath the other; the facts no section below carries
- * (who holds engagement authority, the leaker forecast, contested and stale tracks); and, at the
- * foot of the card, the actions.
+ * closing beneath one and rounds ready beneath the other; and the two facts no section below carries
+ * (who holds engagement authority, the leaker forecast). One action, Locate the first impact, is an icon
+ * at the right of the title: the picture time is on the time bar, contested and stale tracks on the
+ * Layers and Sources lists, the board on the Targets tab and the assistant in the top bar.
  * Read from situationOf, the Target Board's own figures, so both pages agree.
  */
 import { useMemo } from 'react';
-import { Button, Tooltip } from '@faclon-labs/fds';
-import { Crosshair, ListChecks, Plane, Shield, Sparkles } from 'lucide-react';
+import { IconButton, Tooltip } from '@faclon-labs/fds';
+import { Crosshair, Plane, Shield } from 'lucide-react';
 import { useClient, useClientTick, useEngineTime, useViewStore } from '@me/map-react';
 import type { Derived } from './derived.ts';
 import { deriveTargets } from './targets.ts';
@@ -18,14 +19,13 @@ import { situationOf } from './situation.ts';
 import { magState, type MagState } from './magazine.ts';
 import { ObjectHead } from './ObjectHead.tsx';
 import { Facts } from './Facts.tsx';
-import { raidLabel } from './format.ts';
 import type { Ink } from './type.ts';
 
 // Rounds are a figure, not a state word: grey while ready, coloured only at low or the floor.
 type Dot = 'Negative' | 'Notice' | 'Information' | 'Positive';
 const MAG_INK: Record<MagState, Ink> = { ok: 'secondary', low: 'notice', floor: 'negative' };
 
-export function TheatreCard({ derived, onOpenBoard, onAsk }: { derived: Derived; onOpenBoard?: () => void; onAsk?: (question: string) => void }) {
+export function TheatreCard({ derived }: { derived: Derived }) {
   const client = useClient();
   const view = useViewStore();
   const tick = useClientTick(1000);
@@ -34,7 +34,6 @@ export function TheatreCard({ derived, onOpenBoard, onAsk }: { derived: Derived;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const targets = useMemo(() => deriveTargets(client, t, derived.center), [client, tick, Math.floor(t / 1000)]);
   const sit = situationOf(client, derived, targets);
-  const clock = client.scenario?.clock;
 
   const closing = derived.closing.R4 + derived.closing.R3 + derived.closing.R2 + derived.closing.R1;
   const { word, ink, dot } = theatreState(sit, closing);
@@ -53,7 +52,18 @@ export function TheatreCard({ derived, onOpenBoard, onAsk }: { derived: Derived;
       <ObjectHead
         dot={dot}
         title="Theatre"
-        aside={clock ? raidLabel(t, clock) : undefined}
+        trailing={
+          <Tooltip content={sit.firstImpactRef ? `Locate the first impact: select ${sit.firstImpactRef} and centre the map on it` : 'Nothing inbound'}>
+            <IconButton
+              icon={Crosshair}
+              size="Medium"
+              isHighlighted
+              accessibilityLabel={sit.firstImpactRef ? `Locate first impact, ${sit.firstImpactRef}` : 'Locate first impact: nothing inbound'}
+              isDisabled={!sit.firstImpactRef}
+              onClick={() => sit.firstImpactRef && view.set({ selected: sit.firstImpactRef, locate: sit.firstImpactRef })}
+            />
+          </Tooltip>
+        }
         // A clear theatre with nothing inbound says nothing: the line appears only when there is something to read.
         {...(word === 'Clear' && imp === null ? {} : { state: { word, ink } })}
         parts={imp !== null ? [{ text: `first impact ${Math.max(0, Math.round(imp))} min`, ink: impInk }, ...(sit.firstImpactRef ? [sit.firstImpactRef] : [])] : []}
@@ -76,33 +86,8 @@ export function TheatreCard({ derived, onOpenBoard, onAsk }: { derived: Derived;
           // The holder can run to two lines in its half of the grid rather than be cut.
           ['Authority', <span className="bs-wrap">{sit.authority.holder}</span>],
           ['Leakers', sit.leakers.value !== null ? <span className={sit.leakers.fired ? 'bs-ink-negative' : ''}>{`${sit.leakers.value}${sit.leakers.threshold !== null ? ` / ${sit.leakers.threshold}` : ''}`}</span> : 'No forecast'],
-          ['Contested', String(derived.contested)],
-          ['Stale', String(derived.stale)],
         ]}
       />
-      <div className="bs-head__actions">
-        <Button size="sm" variant="primary" tone="brand" isFullWidth leadingIcon={<ListChecks size={14} />} isDisabled={!onOpenBoard} onClick={() => onOpenBoard?.()}>
-          Board
-        </Button>
-        <Tooltip content={sit.firstImpactRef ? `First impact: select ${sit.firstImpactRef} and centre the map on it` : 'Nothing inbound'}>
-          <Button
-            size="sm"
-            variant="secondary"
-            tone="neutral"
-            isFullWidth
-            leadingIcon={<Crosshair size={14} />}
-            isDisabled={!sit.firstImpactRef}
-            onClick={() => sit.firstImpactRef && view.set({ selected: sit.firstImpactRef, locate: sit.firstImpactRef })}
-          >
-            Locate
-          </Button>
-        </Tooltip>
-        <Tooltip content="The assistant summarises the raid from the record">
-          <Button size="sm" variant="secondary" tone="neutral" isFullWidth leadingIcon={<Sparkles size={14} />} isDisabled={!onAsk} onClick={() => onAsk?.('Summarise the raid at this picture time')}>
-            Ask
-          </Button>
-        </Tooltip>
-      </div>
     </section>
   );
 }

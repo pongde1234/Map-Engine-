@@ -4,21 +4,25 @@
  */
 import { Badge, Code } from '@faclon-labs/fds';
 import { formatMgrs, formatRangeBearing, inverse } from '@me/geo';
-import { useClient, useClientTick, useView } from '@me/map-react';
+import { useClient, useClientTick, useEngineTime, useView } from '@me/map-react';
+import { raidLabel } from './format.ts';
 
 /**
- * The map's one standing tag: the material is synthetic. Time, replay or live and the play rate
- * are on the timeline; track, hostile and contested counts are in the right panel. A dropped
- * link is the only other tag, and only while it lasts.
+ * The console's standing tags, at the right of its tab strip so every view shows them in the same place: the picture
+ * time every view is drawn at, and that the material is synthetic. A dropped link is the only other tag, and only
+ * while it lasts. Replay or live and the play rate are on the Battlespace time bar.
  */
 export function StatusBadges() {
   const client = useClient();
   useClientTick(1000);
+  const t = useEngineTime(1000);
+  const clock = client.scenario?.clock;
   const down = client.conn !== 'open';
   return (
     <div className="bs-badges" role="status" aria-label="Picture status">
-      <Badge size="Small" color="Neutral" emphasis="Intense" label="SYNTHETIC" />
-      {down ? <Badge size="Small" color="Negative" emphasis="Intense" label="RECONNECTING" /> : null}
+      <Badge size="Small" color="Information" emphasis="Subtle" label={`Picture ${clock ? raidLabel(t, clock) : raidLabel(t, undefined).slice(0, 5)}`} />
+      <Badge size="Small" color="Neutral" emphasis="Intense" label="Synthetic" />
+      {down ? <Badge size="Small" color="Negative" emphasis="Intense" label="Reconnecting" /> : null}
     </div>
   );
 }
